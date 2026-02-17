@@ -3,6 +3,10 @@ import 'package:flutter_auth/constants.dart';
 import 'package:flutter_auth/models/prayer.dart';
 import 'package:flutter_auth/components/glass_card.dart';
 import 'package:flutter_auth/Screens/grow_in_faith/components/media_detail_screen.dart';
+import 'package:flutter_auth/Screens/prayer_agenda/prayer_agenda_screen.dart';
+import 'package:flutter_auth/Screens/divine_office/divine_office_screen.dart';
+import 'package:flutter_auth/Screens/rosary/rosary_screen.dart';
+import 'package:flutter_auth/Screens/confession/confession_screen.dart';
 
 class GrowInFaithScreen extends StatefulWidget {
   const GrowInFaithScreen({Key? key}) : super(key: key);
@@ -73,6 +77,22 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 24),
+                _buildSectionHeader('Préparation à la Confession'),
+                const SizedBox(height: 16),
+                _buildConfessionCard(),
+                const SizedBox(height: 32),
+                _buildSectionHeader('Chapelet Guidé'),
+                const SizedBox(height: 16),
+                _buildRosaryCard(),
+                const SizedBox(height: 32),
+                _buildSectionHeader('Office des Heures'),
+                const SizedBox(height: 16),
+                _buildDivineOfficeCard(),
+                const SizedBox(height: 32),
+                _buildSectionHeader('Agenda de Prière'),
+                const SizedBox(height: 16),
+                _buildPrayerAgendaCard(),
+                const SizedBox(height: 32),
                 _buildSectionHeader('Prions Ensemble'),
                 const SizedBox(height: 16),
                 _buildPrayerHorizontalList(),
@@ -285,6 +305,182 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
           ],
         );
       },
+    );
+  }
+
+  Widget _buildConfessionCard() {
+    return GlassCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.healing, color: kAccentColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Préparation à la Confession',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  'Examen de conscience et prières',
+                  style: TextStyle(color: kTextSecondaryColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, color: kAccentColor, size: 16),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ConfessionScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRosaryCard() {
+    return GlassCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.celebration, color: kAccentColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chapelet Guidé',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  'Priez le chapelet avec méditations',
+                  style: TextStyle(color: kTextSecondaryColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, color: kAccentColor, size: 16),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RosaryScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDivineOfficeCard() {
+    return GlassCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.church_outlined, color: kAccentColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Office des Heures',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  'Prière liturgique avec audio',
+                  style: TextStyle(color: kTextSecondaryColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, color: kAccentColor, size: 16),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const DivineOfficeScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPrayerAgendaCard() {
+    return GlassCard(
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: kBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.calendar_today_outlined, color: kAccentColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Agenda de Prière',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                Text(
+                  'Planifiez vos temps de prière quotidiens',
+                  style: TextStyle(color: kTextSecondaryColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, color: kAccentColor, size: 16),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PrayerAgendaScreen(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 
