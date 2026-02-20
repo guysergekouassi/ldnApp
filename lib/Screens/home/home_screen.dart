@@ -28,7 +28,9 @@ class HomeScreen extends StatelessWidget {
           ),
           IconButton(
             icon: const Icon(Icons.person_outline, color: kTextColor),
-            onPressed: () {},
+            onPressed: () {
+              Navigator.pushNamed(context, '/profile');
+            },
           ),
         ],
       ),
@@ -397,6 +399,22 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  int _getCurrentIndex(BuildContext context) {
+    final routeName = ModalRoute.of(context)?.settings.name;
+    switch (routeName) {
+      case '/home':
+        return 0;
+      case '/grow-in-faith':
+        return 1;
+      case '/community':
+        return 3;
+      case '/profile':
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
   void _onItemTapped(int index, BuildContext context) {
     switch (index) {
       case 0:
@@ -412,6 +430,11 @@ class HomeScreen extends StatelessWidget {
       case 3:
         if (ModalRoute.of(context)?.settings.name != '/community') {
           Navigator.pushReplacementNamed(context, '/community');
+        }
+        break;
+      case 4:
+        if (ModalRoute.of(context)?.settings.name != '/profile') {
+          Navigator.pushReplacementNamed(context, '/profile');
         }
         break;
     }
@@ -436,7 +459,7 @@ class HomeScreen extends StatelessWidget {
         unselectedItemColor: kTextSecondaryColor,
         selectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
         unselectedLabelStyle: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-        currentIndex: 0,
+        currentIndex: _getCurrentIndex(context),
         onTap: (index) => _onItemTapped(index, context),
         items: const [
           BottomNavigationBarItem(

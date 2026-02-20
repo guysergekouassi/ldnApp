@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_auth/constants.dart';
 import 'package:flutter_auth/components/glass_card.dart';
+import 'package:flutter_auth/Screens/profile/personal_info_screen.dart';
 
 class ProfileMenu extends StatelessWidget {
   const ProfileMenu({Key? key}) : super(key: key);
@@ -14,7 +15,10 @@ class ProfileMenu extends StatelessWidget {
             'Informations personnelles',
             Icons.person,
             kPrimaryColor,
-            () => _showComingSoon(context, 'Informations personnelles'),
+            () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const PersonalInfoScreen()),
+            ),
           ),
           _buildMenuItem(
             'Sécurité',

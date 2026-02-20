@@ -4,6 +4,9 @@ import 'package:flutter_auth/constants.dart';
 import 'package:flutter_auth/screens/home/home_screen.dart';
 import 'package:flutter_auth/screens/grow_in_faith/grow_in_faith_screen.dart';
 import 'package:flutter_auth/screens/community/community_screen.dart';
+import 'package:flutter_auth/Screens/profile/profile_screen.dart';
+import 'package:flutter_auth/Screens/profile/profile_nav_screen.dart';
+import 'package:flutter_auth/Screens/auth/auth_screen.dart';
 
 import 'package:flutter_auth/Screens/splash/splash_screen.dart';
 
@@ -47,9 +50,11 @@ class MyApp extends StatelessWidget {
       routes: {
         '/splash': (context) => const SplashScreen(),
         '/': (context) => const WelcomeScreen(),
+        '/auth': (context) => const AuthScreen(),
         '/home': (context) => const HomeScreen(),
         '/grow-in-faith': (context) => const GrowInFaithScreen(),
         '/community': (context) => const CommunityScreen(),
+        '/profile': (context) => const ProfileNavScreen(),
       },
     );
   }

@@ -7,6 +7,10 @@ import 'package:flutter_auth/Screens/prayer_agenda/prayer_agenda_screen.dart';
 import 'package:flutter_auth/Screens/divine_office/divine_office_screen.dart';
 import 'package:flutter_auth/Screens/rosary/rosary_screen.dart';
 import 'package:flutter_auth/Screens/confession/confession_screen.dart';
+import 'package:flutter_auth/Screens/grow_in_faith/pages/prayer_detail_screen.dart';
+import 'package:flutter_auth/Screens/grow_in_faith/pages/bible_category_screen.dart';
+import 'package:flutter_auth/Screens/grow_in_faith/pages/prayer_journey_screen.dart';
+import 'package:flutter_auth/Screens/grow_in_faith/pages/challenge_detail_screen.dart';
 
 class GrowInFaithScreen extends StatefulWidget {
   const GrowInFaithScreen({Key? key}) : super(key: key);
@@ -119,6 +123,10 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 24),
+                _buildSectionHeader('À la une'),
+                const SizedBox(height: 16),
+                _buildFeaturedTeaching(),
+                const SizedBox(height: 32),
                 _buildSectionHeader('Vidéos Récentes'),
                 const SizedBox(height: 16),
                 _buildMediaList(type: 'video'),
@@ -131,7 +139,25 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
             ),
           ),
           // Méditation Tab
-          const Center(child: Text('Méditation Content')),
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(defaultPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                _buildMeditationOfTheDay(),
+                const SizedBox(height: 32),
+                _buildSectionHeader('Parcours de Méditation'),
+                const SizedBox(height: 16),
+                _buildMeditationPaths(),
+                const SizedBox(height: 32),
+                _buildSectionHeader('Sons d\'ambiance'),
+                const SizedBox(height: 16),
+                _buildAmbientSounds(),
+                const SizedBox(height: 30),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomNavigationBar(1),
@@ -158,41 +184,56 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
         separatorBuilder: (context, index) => const SizedBox(width: 16),
         itemBuilder: (context, index) {
           final prayer = _prayers[index];
-          return Container(
-            width: 140,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                  child: Image.asset(
-                    'assets/images/login_bottom.png',
-                    height: 80,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
+          return InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => PrayerDetailScreen(
+                    title: prayer.title,
+                    content: prayer.description + '\n\nSeigneur, nous nous confions à toi et nous te demandons ta grâce et ta protection.',
+                    category: prayer.category,
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    prayer.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+              );
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 140,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.03),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
                   ),
-                ),
-              ],
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    child: Image.asset(
+                      'assets/images/login_bottom.png',
+                      height: 80,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Text(
+                      prayer.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -219,41 +260,54 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
   }
 
   Widget _buildJourneyItem({required String title, required String subtitle, required String image}) {
-    return GlassCard(
-      padding: const EdgeInsets.all(12),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Image.asset(
-              image,
-              width: 60,
-              height: 60,
-              fit: BoxFit.cover,
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PrayerJourneyScreen(
+              title: title,
+              description: subtitle,
             ),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(color: kTextSecondaryColor, fontSize: 12),
-                ),
-              ],
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: GlassCard(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset(
+                image,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: kTextSecondaryColor),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: kTextSecondaryColor, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: kTextSecondaryColor),
+          ],
+        ),
       ),
     );
-  }
 
   Widget _buildWordCategoriesGrid() {
     final categories = [
@@ -279,30 +333,43 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
       itemCount: categories.length,
       itemBuilder: (context, index) {
         final category = categories[index];
-        return Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => BibleCategoryScreen(
+                  category: category['label'] as String,
+                ),
               ),
-              child: Icon(category['icon'] as IconData, color: kAccentColor, size: 28),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              category['label'] as String,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
-            ),
-          ],
+            );
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.02),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Icon(category['icon'] as IconData, color: kAccentColor, size: 28),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                category['label'] as String,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -485,50 +552,63 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
   }
 
   Widget _buildSpiritualChallengesCard() {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: kBackgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.emoji_events_outlined, color: kAccentColor, size: 28),
-              ),
-              const SizedBox(width: 16),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Défi de la Semaine',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
-                    Text(
-                      'Priez le chapelet chaque jour',
-                      style: TextStyle(color: kTextSecondaryColor, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ChallengeDetailScreen(
+              title: 'Défi de la Semaine',
+              description: 'Priez le chapelet chaque jour pendant une semaine pour renforcer votre foi et votre connexion spirituelle.',
+            ),
           ),
-          const SizedBox(height: 16),
-          LinearProgressIndicator(
-            value: 0.4,
-            backgroundColor: kDividerColor,
-            valueColor: const AlwaysStoppedAnimation<Color>(kAccentColor),
-            minHeight: 8,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ],
+        );
+      },
+      borderRadius: BorderRadius.circular(defaultBorderRadius),
+      child: GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: kBackgroundColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.emoji_events_outlined, color: kAccentColor, size: 28),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Défi de la Semaine',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      Text(
+                        'Priez le chapelet chaque jour',
+                        style: TextStyle(color: kTextSecondaryColor, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            LinearProgressIndicator(
+              value: 0.4,
+              backgroundColor: kDividerColor,
+              valueColor: const AlwaysStoppedAnimation<Color>(kAccentColor),
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        ),
       ),
     );
-  }
 
   Widget _buildBottomNavigationBar(int currentIndex) {
     return Container(
@@ -722,4 +802,251 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
       ),
     );
   }
+  Widget _buildMeditationOfTheDay() {
+    return GlassCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Stack(
+            alignment: Alignment.bottomLeft,
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(defaultBorderRadius)),
+                child: Image.asset(
+                  'assets/images/main_top.png',
+                  height: 180,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Container(
+                height: 180,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(defaultBorderRadius)),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: kAccentColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'MÉDITATION DU JOUR',
+                        style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Trouver la Paix Intérieure',
+                      style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Une session de 10 minutes pour calmer votre esprit et vous connecter à votre foi.',
+                    style: TextStyle(fontSize: 14, color: kTextSecondaryColor),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: kPrimaryColor,
+                    shape: const CircleBorder(),
+                    padding: const EdgeInsets.all(12),
+                  ),
+                  child: const Icon(Icons.play_arrow, color: Colors.white),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMeditationPaths() {
+    final paths = [
+      {'title': 'Débuter la Méditation', 'count': '5 sessions', 'icon': Icons.spa_outlined},
+      {'title': 'Gérer le Stress', 'count': '7 sessions', 'icon': Icons.wb_sunny_outlined},
+      {'title': 'Sommeil Paisible', 'count': '3 sessions', 'icon': Icons.nights_stay_outlined},
+      {'title': 'Gratitude Quotidienne', 'count': '10 sessions', 'icon': Icons.favorite_border},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.3,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
+      itemCount: paths.length,
+      itemBuilder: (context, index) {
+        final path = paths[index];
+        return InkWell(
+          onTap: () {},
+          child: GlassCard(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(path['icon'] as IconData, color: kAccentColor),
+                const SizedBox(height: 8),
+                Text(
+                  path['title'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+                Text(
+                  path['count'] as String,
+                  style: const TextStyle(color: kTextSecondaryColor, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAmbientSounds() {
+    final sounds = [
+      {'name': 'Pluie Douce', 'icon': Icons.umbrella_outlined},
+      {'name': 'Forêt', 'icon': Icons.forest_outlined},
+      {'name': 'Océan', 'icon': Icons.waves_outlined},
+      {'name': 'Rivière', 'icon': Icons.water_outlined},
+    ];
+
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: sounds.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 16),
+        itemBuilder: (context, index) {
+          final sound = sounds[index];
+          return Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: Icon(sound['icon'] as IconData, color: kPrimaryColor),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                sound['name'] as String,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+  Widget _buildFeaturedTeaching() {
+    return InkWell(
+      onTap: () {},
+      child: GlassCard(
+        padding: EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(defaultBorderRadius)),
+                  child: Image.asset(
+                    'assets/images/signup_top.png',
+                    height: 150,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: kPrimaryColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.star, color: Colors.white, size: 12),
+                        SizedBox(width: 4),
+                        Text('POPULAIRE', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Les Secrets de la Prière Efficace',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundColor: kAccentColor.withOpacity(0.1),
+                        child: const Icon(Icons.person, size: 14, color: kAccentColor),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Par Sœur Thérèse', style: TextStyle(color: kTextSecondaryColor, fontSize: 13)),
+                      const Spacer(),
+                      const Icon(Icons.access_time, size: 14, color: kTextSecondaryColor),
+                      const SizedBox(width: 4),
+                      const Text('15 min', style: TextStyle(color: kTextSecondaryColor, fontSize: 13)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
+
+

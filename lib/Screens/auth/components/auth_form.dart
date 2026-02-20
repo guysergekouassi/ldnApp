@@ -325,29 +325,7 @@ class _AuthFormState extends State<AuthForm> {
   }
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      if (!widget.isLogin && !_agreeToTerms) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Veuillez accepter les conditions d\'utilisation'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-
-      // TODO: Implement authentication logic
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.isLogin ? 'Connexion en cours...' : 'Inscription en cours...'),
-          backgroundColor: kPrimaryColor,
-        ),
-      );
-
-      // Simulate authentication delay
-      Future.delayed(const Duration(seconds: 2), () {
-        Navigator.pushReplacementNamed(context, '/home');
-      });
-    }
+    // Navigation directe vers l'accueil pour le développement
+    Navigator.pushReplacementNamed(context, '/home');
   }
 }

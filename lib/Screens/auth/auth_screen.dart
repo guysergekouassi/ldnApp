@@ -4,7 +4,8 @@ import 'package:flutter_auth/Screens/auth/components/auth_form.dart';
 import 'package:flutter_auth/Screens/auth/components/social_login_buttons.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({Key? key}) : super(key: key);
+  final bool initialIsLogin;
+  const AuthScreen({Key? key, this.initialIsLogin = true}) : super(key: key);
 
   @override
   _AuthScreenState createState() => _AuthScreenState();
@@ -14,11 +15,12 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  bool _isLogin = true;
+  late bool _isLogin;
 
   @override
   void initState() {
     super.initState();
+    _isLogin = widget.initialIsLogin;
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 1200),
       vsync: this,
@@ -103,7 +105,6 @@ class _AuthScreenState extends State<AuthScreen> with SingleTickerProviderStateM
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(16),
-                    backdrop: const BoxDecoration(),
                   ),
                   child: Icon(
                     _isLogin ? Icons.login : Icons.person_add,

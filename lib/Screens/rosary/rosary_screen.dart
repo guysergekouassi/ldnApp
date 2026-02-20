@@ -379,57 +379,64 @@ class _RosaryScreenState extends State<RosaryScreen> with TickerProviderStateMix
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Progression',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-          ),
-          const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: List.generate(5, (decadeIndex) {
-              return Column(
-                children: [
-                  Text(
-                    'Dizaine ${decadeIndex + 1}',
-                    style: TextStyle(fontSize: 10, color: kTextSecondaryColor),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: List.generate(10, (beadIndex) {
-                      final isCurrentDecade = decadeIndex == _currentDecade;
-                      final isCurrentBead = isCurrentDecade && beadIndex == _currentBead;
-                      final isCompleted = decadeIndex < _currentDecade || 
-                                       (isCurrentDecade && beadIndex < _currentBead);
-                      
-                      return Container(
-                        margin: const EdgeInsets.only(right: 2),
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: isCompleted ? kAccentColor : 
-                                 isCurrentBead ? kPrimaryColor : kDividerColor,
-                          shape: BoxShape.circle,
-                          border: isCurrentBead ? Border.all(color: kPrimaryColor, width: 2) : null,
-                        ),
-                      );
-                    }),
-                  ),
-                ],
-              );
-            }),
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Progression',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: kAccentColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  'Dizaine ${_currentDecade + 1}/5',
+                  style: const TextStyle(color: kAccentColor, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
+          Center(
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 12,
+              children: List.generate(10, (beadIndex) {
+                final isCurrent = beadIndex == _currentBead;
+                final isCompleted = beadIndex < _currentBead;
+                
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  width: isCurrent ? 14 : 10,
+                  height: isCurrent ? 14 : 10,
+                  decoration: BoxDecoration(
+                    color: isCompleted ? kAccentColor : (isCurrent ? kPrimaryColor : kDividerColor),
+                    shape: BoxShape.circle,
+                    boxShadow: isCurrent ? [
+                      BoxShadow(color: kPrimaryColor.withOpacity(0.4), blurRadius: 8, spreadRadius: 2)
+                    ] : null,
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 24),
           LinearProgressIndicator(
             value: (_currentDecade * 10 + _currentBead) / 50,
-            backgroundColor: kDividerColor,
-            valueColor: AlwaysStoppedAnimation<Color>(kAccentColor),
-            minHeight: 6,
+            backgroundColor: kDividerColor.withOpacity(0.5),
+            valueColor: const AlwaysStoppedAnimation<Color>(kAccentColor),
+            minHeight: 8,
+            borderRadius: BorderRadius.circular(4),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Center(
             child: Text(
-              '${_currentDecade * 10 + _currentBead}/50 prières',
-              style: TextStyle(fontSize: 12, color: kTextSecondaryColor),
+              '${_currentDecade * 10 + _currentBead}/50 prières complétées',
+              style: const TextStyle(fontSize: 12, color: kTextSecondaryColor, fontWeight: FontWeight.w500),
             ),
           ),
         ],

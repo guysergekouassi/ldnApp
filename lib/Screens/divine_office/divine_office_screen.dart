@@ -380,35 +380,44 @@ class _DivineOfficeScreenState extends State<DivineOfficeScreen> with TickerProv
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              reading.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: kTextColor,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: kPrimaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                reading.title.toUpperCase(),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                  color: kPrimaryColor,
+                  letterSpacing: 1.2,
+                ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(
               reading.content,
-              style: TextStyle(
-                fontSize: 14,
-                color: kTextSecondaryColor,
-                height: 1.5,
+              style: const TextStyle(
+                fontSize: 16,
+                color: kTextColor,
+                height: 1.6,
+                fontFamily: 'Georgia', // Using a serif font for a liturgical feel if available, else fallback
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton.icon(
-                  onPressed: () {
-                    // TODO: Implement text-to-speech
-                  },
-                  icon: const Icon(Icons.volume_up, size: 16),
-                  label: const Text('Écouter'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: kPrimaryColor,
+                OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: const Icon(Icons.volume_up, size: 18),
+                  label: const Text('Audio'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: kAccentColor,
+                    side: const BorderSide(color: kAccentColor),
+                    shape: const StadiumBorder(),
                   ),
                 ),
               ],

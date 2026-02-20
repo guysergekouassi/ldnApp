@@ -7,16 +7,19 @@ class ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(defaultPadding * 2),
-      child: Column(
-        children: [
-          const SizedBox(height: 40),
-          _buildProfilePicture(),
-          const SizedBox(height: 16),
-          _buildUserInfo(),
-          const SizedBox(height: 16),
-          _buildStatusBadge(),
-        ],
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: defaultPadding),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 10),
+            _buildProfilePicture(),
+            const SizedBox(height: 12),
+            _buildUserInfo(),
+            const SizedBox(height: 12),
+            _buildStatusBadge(),
+          ],
+        ),
       ),
     );
   }

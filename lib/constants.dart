@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 const kPrimaryColor = Color(0xFF6F9AFA); // Soft blue
 const kPrimaryLightColor = Color(0xFFF0F4FD); // Very light blue for backgrounds
 const kAccentColor = Color(0xFFE69138); // Warm orange
+const kSecondaryColor = Color(0xFF4CAF50); // Green for secondary actions
 const kBackgroundColor = Color(0xFFF5F7FA); // Off-white/gray background
 const kCardColor = Colors.white;
 const kTextColor = Color(0xFF2D3142); // Dark slate for text

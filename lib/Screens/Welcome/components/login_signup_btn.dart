@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../constants.dart';
-import '../../Login/login_screen.dart';
-import '../../Signup/signup_screen.dart';
+import '../../auth/auth_screen.dart';
 
 class LoginAndSignupBtn extends StatelessWidget {
   const LoginAndSignupBtn({
@@ -19,7 +18,7 @@ class LoginAndSignupBtn extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) {
-                  return const LoginScreen();
+                  return const AuthScreen(initialIsLogin: true);
                 },
               ),
             );
@@ -35,7 +34,7 @@ class LoginAndSignupBtn extends StatelessWidget {
               context,
               MaterialPageRoute(
                 builder: (context) {
-                  return const SignUpScreen();
+                  return const AuthScreen(initialIsLogin: false);
                 },
               ),
             );
