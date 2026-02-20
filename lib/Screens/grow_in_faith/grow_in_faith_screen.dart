@@ -308,6 +308,7 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
         ),
       ),
     );
+  }
 
   Widget _buildWordCategoriesGrid() {
     final categories = [
@@ -609,6 +610,7 @@ class _GrowInFaithScreenState extends State<GrowInFaithScreen> with SingleTicker
         ),
       ),
     );
+  }
 
   Widget _buildBottomNavigationBar(int currentIndex) {
     return Container(
