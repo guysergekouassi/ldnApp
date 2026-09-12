@@ -1,60 +1,124 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_auth/Screens/Welcome/welcome_screen.dart';
-import 'package:flutter_auth/constants.dart';
-import 'package:flutter_auth/screens/home/home_screen.dart';
-import 'package:flutter_auth/screens/grow_in_faith/grow_in_faith_screen.dart';
-import 'package:flutter_auth/screens/community/community_screen.dart';
-import 'package:flutter_auth/Screens/profile/profile_screen.dart';
-import 'package:flutter_auth/Screens/profile/profile_nav_screen.dart';
-import 'package:flutter_auth/Screens/auth/auth_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'screens/splash_screen.dart';
+import 'services/notification_service.dart';
+import 'package:provider/provider.dart';
+import 'providers/theme_provider.dart';
+import 'responsive.dart';
 
-import 'package:flutter_auth/Screens/splash/splash_screen.dart';
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-void main() => runApp(const MyApp());
+  // L'initialisation ne doit jamais empêcher l'affichage : si une exception
+  // remontait ici, `runApp` n'était jamais appelé et l'application restait sur
+  // un écran blanc, sans aucun message — invisible en debug, bloquant en release.
+  String? erreurDemarrage;
 
-class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 20));
+  } catch (e) {
+    erreurDemarrage = "Connexion à Firebase impossible.\n\n$e";
+    debugPrint("Échec de l'initialisation Firebase : $e");
+  }
 
-  // This widget is the root of your application.
+  // Les notifications sont accessoires au démarrage : un échec ne doit pas
+  // empêcher l'application de s'ouvrir.
+  try {
+    await NotificationService().init().timeout(const Duration(seconds: 10));
+  } catch (e) {
+    debugPrint("Échec de l'initialisation des notifications : $e");
+  }
+
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: MyApp(erreurDemarrage: erreurDemarrage),
+    ),
+  );
+}
+
+/// Écran affiché quand l'application ne peut pas démarrer, à la place d'une
+/// page blanche muette.
+class _ErreurDemarrageScreen extends StatelessWidget {
+  final String message;
+
+  const _ErreurDemarrageScreen({required this.message});
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'APP JEP',
-      theme: ThemeData(
-          primaryColor: kPrimaryColor,
-          scaffoldBackgroundColor: Colors.white,
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              elevation: 0,
-              foregroundColor: Colors.white,
-              backgroundColor: kPrimaryColor,
-              shape: const StadiumBorder(),
-              maximumSize: const Size(double.infinity, 56),
-              minimumSize: const Size(double.infinity, 56),
-            ),
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: Padding(
+        padding: const EdgeInsets.all(30.0),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.cloud_off, size: 56, color: Colors.orange),
+              const SizedBox(height: 20),
+              const Text(
+                "Démarrage impossible",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                "Vérifie ta connexion Internet puis relance l'application.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.black87),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                message,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 11, color: Colors.grey),
+              ),
+            ],
           ),
-          inputDecorationTheme: const InputDecorationTheme(
-            filled: true,
-            fillColor: kPrimaryLightColor,
-            iconColor: kPrimaryColor,
-            prefixIconColor: kPrimaryColor,
-            contentPadding: EdgeInsets.symmetric(
-                horizontal: defaultPadding, vertical: defaultPadding),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.all(Radius.circular(30)),
-              borderSide: BorderSide.none,
-            ),
-          )),
-      initialRoute: '/splash',
-      routes: {
-        '/splash': (context) => const SplashScreen(),
-        '/': (context) => const WelcomeScreen(),
-        '/auth': (context) => const AuthScreen(),
-        '/home': (context) => const HomeScreen(),
-        '/grow-in-faith': (context) => const GrowInFaithScreen(),
-        '/community': (context) => const CommunityScreen(),
-        '/profile': (context) => const ProfileNavScreen(),
+        ),
+      ),
+    );
+  }
+}
+
+class MyApp extends StatelessWidget {
+  /// Renseigné si l'initialisation a échoué : on affiche alors un écran
+  /// explicite au lieu de laisser l'utilisateur devant une page vide.
+  final String? erreurDemarrage;
+
+  const MyApp({Key? key, this.erreurDemarrage}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'JEP',
+          themeMode: themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primarySwatch: Colors.blue,
+            scaffoldBackgroundColor: const Color(0xFFF8F9FA),
+          ),
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primarySwatch: Colors.orange,
+            scaffoldBackgroundColor: const Color(0xFF121212),
+            cardColor: const Color(0xFF1E1E1E),
+          ),
+          // Applique la borne d'agrandissement de police à toute l'application,
+          // y compris aux boîtes de dialogue et feuilles modales.
+          builder: (context, child) => ClampedTextScale(
+            child: child ?? const SizedBox.shrink(),
+          ),
+          home: erreurDemarrage != null
+              ? _ErreurDemarrageScreen(message: erreurDemarrage!)
+              : const SplashScreen(),
+        );
       },
     );
   }

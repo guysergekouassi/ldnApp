@@ -31,8 +31,21 @@
 /build/
 
 # Web related
-lib/generated_plugin_registrant.dart
 
 # Exceptions to above rules.
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 pubspec.lock
+
+# Configuration Firebase : identifiants et clés API du projet.
+# Volontairement hors du dépôt (public). À régénérer sur chaque machine avec :
+#   flutterfire configure
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+firebase.json
+
+# Scripts jetables de retouche d'images / remplacement, à chemins absolus.
+crop_image.ps1
+get_size.ps1
+make_transparent.ps1
+scratch_replace.py

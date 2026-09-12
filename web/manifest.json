@@ -1,16 +1,11 @@
 {
-<<<<<<< HEAD
-    "name": "welcome_login_signup_page_flutter",
-    "short_name": "welcome_login_signup_page_flutter",
-=======
-    "name": "flutter_auth",
-    "short_name": "flutter_auth",
->>>>>>> responsive
+    "name": "JEP — Jeunesse En Prière",
+    "short_name": "JEP",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FFFFFF",
+    "theme_color": "#F59E0B",
+    "description": "Grandis dans ta foi et deviens une Lumière pour les nations.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

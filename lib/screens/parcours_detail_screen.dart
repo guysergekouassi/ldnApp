@@ -1,0 +1,424 @@
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../services/firestore_service.dart';
+import '../models/parcours_content_model.dart';
+import 'parcours_lesson_screen.dart';
+
+/// Écran de détail d'un parcours, entièrement piloté par le document
+/// `parcours_content/<parcoursId>` : titre, sous-titre, couleur, visuel et
+/// leçons proviennent de Firestore.
+class ParcoursDetailScreen extends StatefulWidget {
+  final String parcoursId;
+
+  const ParcoursDetailScreen({Key? key, required this.parcoursId}) : super(key: key);
+
+  @override
+  State<ParcoursDetailScreen> createState() => _ParcoursDetailScreenState();
+}
+
+class _ParcoursDetailScreenState extends State<ParcoursDetailScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+  final String? _uid = FirebaseAuth.instance.currentUser?.uid;
+
+  String get _parcoursId => widget.parcoursId;
+
+  Color _primaryColorOf(ParcoursContent? content) {
+    if (content == null) return Colors.orange;
+    try {
+      return Color(int.parse(content.colorHex.replaceFirst('#', '0xFF')));
+    } catch (_) {
+      return Colors.orange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: StreamBuilder<ParcoursContent?>(
+        stream: _firestoreService.getParcoursContent(_parcoursId),
+        builder: (context, contentSnapshot) {
+          if (contentSnapshot.connectionState == ConnectionState.waiting) {
+             return const Center(child: CircularProgressIndicator(color: Colors.orange));
+          }
+          final parcoursContent = contentSnapshot.data;
+          final int totalDays = parcoursContent?.lessons.length ?? 0;
+          final Color primaryColor = _primaryColorOf(parcoursContent);
+
+          return StreamBuilder<int>(
+            stream: _uid != null
+                ? _firestoreService.getParcoursProgress(_uid!, _parcoursId)
+                : Stream.value(0),
+            builder: (context, snapshot) {
+              int completedDays = snapshot.data ?? 0;
+              return SingleChildScrollView(
+                child: Column(
+                  children: [
+                    _buildHeader(context, parcoursContent, primaryColor),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SizedBox(height: 10),
+                          _buildProgressionCard(completedDays, totalDays, primaryColor),
+                          const SizedBox(height: 25),
+                          Text(
+                            "Les $totalDays jours du parcours",
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+                          ),
+                          const SizedBox(height: 15),
+                          _buildTimeline(completedDays, parcoursContent, primaryColor),
+                          const SizedBox(height: 25),
+                          _buildContinueBanner(completedDays, parcoursContent, primaryColor),
+                          const SizedBox(height: 30),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          );
+        }
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, ParcoursContent? content, Color primaryColor) {
+    return Stack(
+      children: [
+        Positioned(
+          top: 0,
+          right: 0,
+          left: 0,
+          height: 250,
+          child: Image.asset(
+            content?.imageAsset ?? "assets/sunset_bg.jpg",
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(color: primaryColor.withOpacity(0.5)),
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 0,
+          left: 0,
+          height: 250,
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.4),
+                  Colors.black.withOpacity(0.1),
+                  const Color(0xFFF8F9FA),
+                ],
+                stops: const [0.0, 0.5, 1.0],
+              ),
+            ),
+          ),
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 5),
+                    ],
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.chevron_left, color: Colors.black87),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  content?.kicker ?? "Parcours",
+                  style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+                Text(
+                  content?.title ?? "",
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: 250,
+                  child: Text(
+                    content == null
+                        ? ""
+                        : "${content.subtitle} ${content.lessons.length} étapes pratiques.",
+                    style: const TextStyle(fontSize: 12, color: Colors.black54, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildProgressionCard(int completedDays, int totalDays, Color primaryColor) {
+    double progress = totalDays > 0 ? completedDays / totalDays : 0.0;
+    if (progress > 1.0) progress = 1.0;
+    
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Ta progression", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 16)),
+              Text("${(progress * 100).toInt()}%", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+            ],
+          ),
+          const SizedBox(height: 15),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.grey.shade200,
+              valueColor: AlwaysStoppedAnimation<Color>(primaryColor),
+              minHeight: 10,
+            ),
+          ),
+          const SizedBox(height: 15),
+          Text("$completedDays / $totalDays jours complétés", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeline(int completedDays, ParcoursContent? content, Color primaryColor) {
+    if (content == null || content.lessons.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text("Contenu en cours de préparation...", style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic)),
+      );
+    }
+    
+    var levels = content.lessons;
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: levels.length,
+      itemBuilder: (context, index) {
+        bool isLocked = index > completedDays;
+        bool isCompleted = index < completedDays;
+        _LevelStatus status = isCompleted 
+            ? _LevelStatus.completed 
+            : (isLocked ? _LevelStatus.locked : _LevelStatus.inProgress);
+            
+        var level = levels[index];
+
+        return _buildLevelCard(
+          number: index + 1,
+          title: level.title,
+          subtitle: level.desc,
+          status: status,
+          isLast: index == levels.length - 1,
+          primaryColor: primaryColor,
+          onTap: status == _LevelStatus.locked ? null : () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ParcoursLessonScreen(
+                  parcoursId: _parcoursId,
+                  parcoursTitle: content.title,
+                  lessonTitle: level.title,
+                  dayNumber: index + 1,
+                  totalDays: levels.length,
+                  currentCompletedDays: completedDays,
+                  content: level.content,
+                  primaryColor: primaryColor,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLevelCard({
+    required int number,
+    required String title,
+    required String subtitle,
+    required _LevelStatus status,
+    required bool isLast,
+    required Color primaryColor,
+    VoidCallback? onTap,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 40,
+            child: Column(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: status == _LevelStatus.completed ? primaryColor : (status == _LevelStatus.inProgress ? primaryColor.withOpacity(0.2) : Colors.grey.shade300),
+                    shape: BoxShape.circle,
+                    border: status == _LevelStatus.inProgress ? Border.all(color: primaryColor, width: 2) : null,
+                  ),
+                  child: Center(
+                    child: status == _LevelStatus.completed
+                        ? const Icon(Icons.check, color: Colors.white, size: 16)
+                        : Text(
+                            number.toString(),
+                            style: TextStyle(
+                              color: status == _LevelStatus.inProgress ? primaryColor : Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: status == _LevelStatus.completed ? primaryColor : Colors.grey.shade300,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 20.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    if (status != _LevelStatus.locked) BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
+                  ],
+                  border: status == _LevelStatus.inProgress ? Border.all(color: primaryColor.withOpacity(0.5)) : null,
+                ),
+                child: Opacity(
+                  opacity: status == _LevelStatus.locked ? 0.6 : 1.0,
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(15),
+                    title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A))),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 5.0),
+                      child: Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    ),
+                    trailing: status == _LevelStatus.locked
+                        ? const Icon(Icons.lock, color: Colors.grey)
+                        : Icon(Icons.chevron_right, color: primaryColor),
+                    onTap: onTap,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContinueBanner(int completedDays, ParcoursContent? content, Color primaryColor) {
+    if (content == null || content.lessons.isEmpty) return const SizedBox.shrink();
+
+    var levels = content.lessons;
+    int nextDayIndex = completedDays;
+    bool isFinished = nextDayIndex >= levels.length;
+    var currentLevel = isFinished ? levels.last : levels[nextDayIndex];
+
+    return GestureDetector(
+      onTap: isFinished ? null : () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ParcoursLessonScreen(
+              parcoursId: _parcoursId,
+              parcoursTitle: content.title,
+              lessonTitle: currentLevel.title,
+              dayNumber: nextDayIndex + 1,
+              totalDays: levels.length,
+              currentCompletedDays: completedDays,
+              content: currentLevel.content,
+              primaryColor: primaryColor,
+            ),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [primaryColor, primaryColor.withOpacity(0.8)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: primaryColor.withOpacity(0.3), blurRadius: 15, offset: const Offset(0, 5)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(isFinished ? "Parcours terminé !" : "Prêt à continuer ?", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                  const SizedBox(height: 5),
+                  Text(isFinished ? "Félicitations pour ton assiduité." : "Jour ${nextDayIndex + 1} : ${currentLevel.title}", style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 12)),
+                ],
+              ),
+            ),
+            if (!isFinished)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.play_arrow, color: primaryColor),
+              ),
+            if (isFinished)
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, color: Colors.green),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _LevelStatus { completed, inProgress, locked }
