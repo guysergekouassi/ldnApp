@@ -19,11 +19,6 @@ class _GroupesScreenState extends State<GroupesScreen> {
   final FirestoreService _firestoreService = FirestoreService();
   final String? _uid = FirebaseAuth.instance.currentUser?.uid;
 
-  /// Clé de [TypeGroupe.libelles], ou null pour « tous ».
-  String? _filtre;
-
-  String _recherche = '';
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -33,7 +28,7 @@ class _GroupesScreenState extends State<GroupesScreen> {
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.black),
         title: const Text(
-          "Rejoins un groupe",
+          "Rejoins une fratie",
           style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold),
         ),
       ),
@@ -51,23 +46,18 @@ class _GroupesScreenState extends State<GroupesScreen> {
                 return const Center(child: CircularProgressIndicator(color: _violet));
               }
 
-              final tous = snapshot.data ?? <Fraternity>[];
-              final groupes = _filtrer(tous);
+              final groupes = snapshot.data ?? <Fraternity>[];
 
               return ListView(
                 padding: const EdgeInsets.all(15),
                 children: [
-                  _buildIntro(tous.length),
-                  const SizedBox(height: 14),
-                  _buildRecherche(),
-                  const SizedBox(height: 12),
-                  _buildFiltres(tous),
+                  _buildIntro(groupes.length),
                   const SizedBox(height: 16),
                   if (groupes.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 40),
                       child: Text(
-                        "Aucun groupe ne correspond à ta recherche.",
+                        "Les fraties arrivent. Reviens dans un instant.",
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.grey),
                       ),
@@ -84,18 +74,6 @@ class _GroupesScreenState extends State<GroupesScreen> {
     );
   }
 
-  List<Fraternity> _filtrer(List<Fraternity> groupes) {
-    final recherche = _recherche.trim().toLowerCase();
-
-    return groupes.where((g) {
-      if (_filtre != null && g.type != _filtre) return false;
-      if (recherche.isEmpty) return true;
-      // La recherche porte sur le nom et sur le lieu : c'est ce qu'on tape
-      // quand on cherche « un groupe à Cocody ».
-      return g.name.toLowerCase().contains(recherche) ||
-          g.location.toLowerCase().contains(recherche);
-    }).toList();
-  }
 
   Widget _buildIntro(int total) {
     return Container(
@@ -122,78 +100,70 @@ class _GroupesScreenState extends State<GroupesScreen> {
     );
   }
 
-  Widget _buildRecherche() {
-    return TextField(
-      onChanged: (valeur) => setState(() => _recherche = valeur),
-      decoration: InputDecoration(
-        hintText: "Chercher un groupe ou une ville…",
-        hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-        prefixIcon: const Icon(Icons.search, color: Colors.grey, size: 20),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: _violet),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildFiltres(List<Fraternity> groupes) {
-    // On ne propose que les familles réellement présentes dans l'annuaire :
-    // un filtre qui ne renvoie jamais rien n'aide personne.
-    final types = groupes.map((g) => g.type).where((t) => t.isNotEmpty).toSet().toList()
-      ..sort();
 
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
+
+  /// Les rencontres à venir, telles qu'un responsable les a saisies.
+  ///
+  /// La communauté se retrouve deux fois par mois, à des dates qui changent :
+  /// rien n'est calculé ici. Tant que personne n'a renseigné les dates, on le
+  /// dit — une date inventée ferait déplacer quelqu'un pour rien.
+  Widget _buildRencontres(Fraternity groupe) {
+    final dates = groupe.rencontres.isNotEmpty
+        ? groupe.rencontres
+        : (groupe.nextMeetingDate.isNotEmpty ? [groupe.nextMeetingDate] : const <String>[]);
+
+    if (dates.isEmpty) {
+      return Row(
         children: [
-          _buildPuce("Tous", _filtre == null, () => setState(() => _filtre = null)),
-          ...types.map(
-            (type) => _buildPuce(
-              TypeGroupe.libelle(type),
-              _filtre == type,
-              () => setState(() => _filtre = _filtre == type ? null : type),
+          const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              "Deux rencontres par mois · dates à venir",
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 11),
             ),
           ),
         ],
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildPuce(String libelle, bool actif, VoidCallback onTap) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: BoxDecoration(
-            color: actif ? _violet : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: actif ? _violet : const Color(0xFFE5E7EB)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final date in dates) ...[
+          Row(
+            children: [
+              const Icon(Icons.calendar_today, size: 12, color: _violet),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  date,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black54, fontSize: 11),
+                ),
+              ),
+            ],
           ),
-          child: Text(
-            libelle,
-            style: TextStyle(
-              color: actif ? Colors.white : Colors.black87,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
+          const SizedBox(height: 4),
+        ],
+        if (groupe.nextMeetingLocation.isNotEmpty)
+          Row(
+            children: [
+              const Icon(Icons.place_outlined, size: 12, color: _violet),
+              const SizedBox(width: 5),
+              Expanded(
+                child: Text(
+                  groupe.nextMeetingLocation,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.black54, fontSize: 11),
+                ),
+              ),
+            ],
           ),
-        ),
-      ),
+      ],
     );
   }
 
@@ -221,7 +191,7 @@ class _GroupesScreenState extends State<GroupesScreen> {
                   color: const Color(0xFFF3F0FF),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(_icone(TypeGroupe.icone(groupe.type)), color: _violet, size: 18),
+                child: const Icon(Icons.groups_outlined, color: _violet, size: 18),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -234,21 +204,23 @@ class _GroupesScreenState extends State<GroupesScreen> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, size: 12, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            groupe.location,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.grey, fontSize: 11),
+                    if (groupe.location.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 12, color: Colors.grey),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              groupe.location,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.grey, fontSize: 11),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -274,37 +246,7 @@ class _GroupesScreenState extends State<GroupesScreen> {
             ),
           ],
           const SizedBox(height: 12),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today, size: 12, color: _violet),
-              const SizedBox(width: 5),
-              Expanded(
-                child: Text(
-                  groupe.nextMeetingDate.isEmpty ? "Rencontres à venir" : groupe.nextMeetingDate,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.black54, fontSize: 11),
-                ),
-              ),
-            ],
-          ),
-          if (groupe.nextMeetingLocation.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.place_outlined, size: 12, color: _violet),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(
-                    groupe.nextMeetingLocation,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54, fontSize: 11),
-                  ),
-                ),
-              ],
-            ),
-          ],
+          _buildRencontres(groupe),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -405,24 +347,5 @@ class _GroupesScreenState extends State<GroupesScreen> {
 
     if (confirme != true) return;
     await _firestoreService.quitterGroupe(_uid!, groupe.id);
-  }
-
-  IconData _icone(String nom) {
-    switch (nom) {
-      case 'people_outline':
-        return Icons.people_outline;
-      case 'volunteer_activism':
-        return Icons.volunteer_activism;
-      case 'school_outlined':
-        return Icons.school_outlined;
-      case 'favorite_border':
-        return Icons.favorite_border;
-      case 'handshake_outlined':
-        return Icons.handshake_outlined;
-      case 'wifi':
-        return Icons.wifi;
-      default:
-        return Icons.groups_outlined;
-    }
   }
 }

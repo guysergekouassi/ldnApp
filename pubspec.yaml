@@ -90,6 +90,7 @@ flutter:
     - assets/rosary_hero_bg.png
     - assets/mary_praying.png
     - assets/VID/
+    - assets/bible/
   #  - images/a_dot_ham.jpeg
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/assets-and-images/#resolution-aware.

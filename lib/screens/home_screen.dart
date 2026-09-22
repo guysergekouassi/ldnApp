@@ -32,6 +32,7 @@ import '../models/challenge_model.dart';
 import '../models/temoignage_model.dart';
 import 'temoignages_screen.dart';
 import 'bible_plans_screen.dart';
+import 'bible_screen.dart';
 import 'bible_plan_detail_screen.dart';
 import 'divine_misericorde_screen.dart';
 import '../models/bible_plan_model.dart';
@@ -309,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         "Lire la Bible",
                         Icons.menu_book,
                         const Color(0xFF16A34A),
-                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BiblePlansScreen())),
+                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BibleScreen())),
                       ),
                     ),
                   ],

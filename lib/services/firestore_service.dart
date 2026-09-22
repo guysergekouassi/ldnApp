@@ -2692,99 +2692,91 @@ class FirestoreService {
       final existants = await _db.collection('fraternities').get();
       if (existants.docs.isEmpty) return; // amorçage initial, rien à migrer
 
-      final noms = <String, DocumentReference<Map<String, dynamic>>>{};
+      // Les premières versions ont semé des groupes inventés, puis les fraties
+      // sous le nom « Fraternité X ». On ramène tout à un seul document par
+      // fratie, nommé comme la communauté la nomme.
+      final parNom = <String, List<QueryDocumentSnapshot<Map<String, dynamic>>>>{};
       for (final doc in existants.docs) {
-        noms[(doc.data()['name'] ?? '').toString().trim()] = doc.reference;
+        final nom = (doc.data()['name'] ?? '').toString().trim();
+        parNom.putIfAbsent(_nomDeFratie(nom), () => []).add(doc);
       }
 
       for (final groupe in _groupesLivres) {
         final nom = groupe['name'] as String;
-        final ref = noms[nom];
+        final trouves = parNom[nom] ?? const [];
 
-        if (ref == null) {
+        if (trouves.isEmpty) {
           await _db.collection('fraternities').add(groupe);
           continue;
         }
 
-        // Groupe déjà présent : on ne pose que les champs de classement qui
-        // lui manquent, sans toucher à son effectif ni à ses rencontres.
-        final data = existants.docs.firstWhere((d) => d.reference == ref).data();
-        final manquants = <String, dynamic>{};
-        if ((data['type'] ?? '').toString().trim().isEmpty) {
-          manquants['type'] = groupe['type'];
+        // Un seul document survit : celui qui a des membres, sinon le premier.
+        // Les autres sont des doublons nés des renommages successifs.
+        trouves.sort((a, b) => ((b.data()['memberCount'] ?? 0) as int)
+            .compareTo((a.data()['memberCount'] ?? 0) as int));
+        final garde = trouves.first;
+
+        if ((garde.data()['name'] ?? '').toString().trim() != nom) {
+          await garde.reference.update({'name': nom});
         }
-        if ((data['description'] ?? '').toString().trim().isEmpty) {
-          manquants['description'] = groupe['description'];
+        for (final double_ in trouves.skip(1)) {
+          if (((double_.data()['memberCount'] ?? 0) as int) <= 0) {
+            await double_.reference.delete();
+          }
         }
-        if (data['ouvert'] == null) manquants['ouvert'] = true;
-        if (manquants.isNotEmpty) await ref.update(manquants);
+      }
+
+      // Les groupes inventés des versions précédentes s'en vont, sauf si
+      // quelqu'un en a rejoint un : on ne fait pas disparaître sous ses pieds
+      // le groupe d'un membre. Ceux-là sont seulement fermés aux nouvelles
+      // inscriptions, à charge d'un responsable de les traiter.
+      for (final nom in _groupesInventes) {
+        for (final doc in parNom[nom] ?? const []) {
+          final membres = (doc.data()['memberCount'] ?? 0) as int;
+          if (membres <= 0) {
+            await doc.reference.delete();
+          } else if (doc.data()['ouvert'] != false) {
+            await doc.reference.update({'ouvert': false});
+          }
+        }
       }
     } catch (e) {
       debugPrint("Mise à jour de l'annuaire des groupes impossible : $e");
     }
   }
 
+  /// Ramène « Fraternité Saint Michel » et « Fratie Saint Michel » au même
+  /// nom, pour reconnaître comme un doublon ce qui n'est qu'un renommage.
+  static String _nomDeFratie(String nom) {
+    final sansPrefixe = nom
+        .replaceFirst(RegExp(r'^(Fraternité|Fratrie|Fratie)\s+', caseSensitive: false), '')
+        .trim();
+    return sansPrefixe.isEmpty ? nom : 'Fratie $sansPrefixe';
+  }
+
+  /// Les cinq fraties de la communauté.
+  ///
+  /// Ni lieu ni date ici : la communauté se retrouve deux fois par mois à des
+  /// dates qui changent, et un responsable les saisit dans Firestore. Les
+  /// versions précédentes semaient des groupes inventés (« Fratrie Cocody »,
+  /// « Paroisse Saint-Jean, Marcory ») avec des horaires qui ne
+  /// correspondaient à rien : personne ne pouvait s'y rendre.
   static const List<Map<String, dynamic>> _groupesLivres = [
-    {
-      "name": "Fratrie Cocody",
-      "location": "Abidjan, Côte d'Ivoire",
-      "type": "fratrie",
-      "description": "Partage de la Parole et prière fraternelle, tous les samedis après-midi.",
-      "memberCount": 0,
-      "ouvert": true,
-      "nextMeetingDate": "Samedi, 17h00",
-      "nextMeetingLocation": "Centre JEP Cocody",
-    },
-    {
-      "name": "Groupe de prière Marcory",
-      "location": "Abidjan, Côte d'Ivoire",
-      "type": "priere",
-      "description": "Louange, intercession et adoration. Ouvert à tous, sans inscription préalable.",
-      "memberCount": 0,
-      "ouvert": true,
-      "nextMeetingDate": "Mercredi, 19h00",
-      "nextMeetingLocation": "Paroisse Saint-Jean, Marcory",
-    },
-    {
-      "name": "Jeunes & étudiants",
-      "location": "Abidjan, Côte d'Ivoire",
-      "type": "jeunes",
-      "description": "Pour les 18-30 ans : enseignement, discussion libre et temps de prière.",
-      "memberCount": 0,
-      "ouvert": true,
-      "nextMeetingDate": "Vendredi, 18h30",
-      "nextMeetingLocation": "Aumônerie universitaire",
-    },
-    {
-      "name": "Couples & familles",
-      "location": "Abidjan, Côte d'Ivoire",
-      "type": "couples",
-      "description": "Un dimanche par mois, pour prier et échanger sur la vie de famille.",
-      "memberCount": 0,
-      "ouvert": true,
-      "nextMeetingDate": "1er dimanche du mois, 16h00",
-      "nextMeetingLocation": "Centre JEP Cocody",
-    },
-    {
-      "name": "Équipe de service",
-      "location": "Abidjan, Côte d'Ivoire",
-      "type": "service",
-      "description": "Visites aux malades, distribution alimentaire, soutien scolaire.",
-      "memberCount": 0,
-      "ouvert": true,
-      "nextMeetingDate": "Samedi, 9h00",
-      "nextMeetingLocation": "Sur le terrain",
-    },
-    {
-      "name": "Fratrie en ligne",
-      "location": "Partout",
-      "type": "ligne",
-      "description": "Pour ceux qui n'ont pas de groupe près de chez eux : prière commune en visio.",
-      "memberCount": 0,
-      "ouvert": true,
-      "nextMeetingDate": "Mardi, 20h00",
-      "nextMeetingLocation": "Lien envoyé aux inscrits",
-    },
+    {"name": "Fratie Saint Michel", "memberCount": 0, "ouvert": true},
+    {"name": "Fratie Divin Amour", "memberCount": 0, "ouvert": true},
+    {"name": "Fratie Saint François", "memberCount": 0, "ouvert": true},
+    {"name": "Fratie Sacré-Cœur", "memberCount": 0, "ouvert": true},
+    {"name": "Fratie Sainte Faustine", "memberCount": 0, "ouvert": true},
+  ];
+
+  /// Noms semés par les versions précédentes, à retirer de l'annuaire.
+  static const List<String> _groupesInventes = [
+    "Fratrie Cocody",
+    "Groupe de prière Marcory",
+    "Jeunes & étudiants",
+    "Couples & familles",
+    "Équipe de service",
+    "Fratrie en ligne",
   ];
 
   // ---------------------------------------------------------------------------

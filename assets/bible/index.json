@@ -1,0 +1,659 @@
+[
+ {
+  "id": "genese",
+  "nom": "Genèse",
+  "abbr": "Gn",
+  "testament": "AT",
+  "ordre": 1,
+  "chapitres": 50,
+  "versets": 1533
+ },
+ {
+  "id": "exode",
+  "nom": "Exode",
+  "abbr": "Ex",
+  "testament": "AT",
+  "ordre": 2,
+  "chapitres": 40,
+  "versets": 1213
+ },
+ {
+  "id": "levitique",
+  "nom": "Lévitique",
+  "abbr": "Lv",
+  "testament": "AT",
+  "ordre": 3,
+  "chapitres": 27,
+  "versets": 854
+ },
+ {
+  "id": "nombres",
+  "nom": "Nombres",
+  "abbr": "Nb",
+  "testament": "AT",
+  "ordre": 4,
+  "chapitres": 36,
+  "versets": 1289
+ },
+ {
+  "id": "deuteronome",
+  "nom": "Deutéronome",
+  "abbr": "Dt",
+  "testament": "AT",
+  "ordre": 5,
+  "chapitres": 34,
+  "versets": 959
+ },
+ {
+  "id": "josue",
+  "nom": "Josué",
+  "abbr": "Jos",
+  "testament": "AT",
+  "ordre": 6,
+  "chapitres": 24,
+  "versets": 658
+ },
+ {
+  "id": "juges",
+  "nom": "Juges",
+  "abbr": "Jg",
+  "testament": "AT",
+  "ordre": 7,
+  "chapitres": 21,
+  "versets": 619
+ },
+ {
+  "id": "ruth",
+  "nom": "Ruth",
+  "abbr": "Rt",
+  "testament": "AT",
+  "ordre": 8,
+  "chapitres": 4,
+  "versets": 85
+ },
+ {
+  "id": "1_samuel",
+  "nom": "1 Samuel",
+  "abbr": "1 S",
+  "testament": "AT",
+  "ordre": 9,
+  "chapitres": 31,
+  "versets": 811
+ },
+ {
+  "id": "2_samuel",
+  "nom": "2 Samuel",
+  "abbr": "2 S",
+  "testament": "AT",
+  "ordre": 10,
+  "chapitres": 24,
+  "versets": 695
+ },
+ {
+  "id": "1_rois",
+  "nom": "1 Rois",
+  "abbr": "1 R",
+  "testament": "AT",
+  "ordre": 11,
+  "chapitres": 22,
+  "versets": 817
+ },
+ {
+  "id": "2_rois",
+  "nom": "2 Rois",
+  "abbr": "2 R",
+  "testament": "AT",
+  "ordre": 12,
+  "chapitres": 25,
+  "versets": 719
+ },
+ {
+  "id": "1_chroniques",
+  "nom": "1 Chroniques",
+  "abbr": "1 Ch",
+  "testament": "AT",
+  "ordre": 13,
+  "chapitres": 29,
+  "versets": 943
+ },
+ {
+  "id": "2_chroniques",
+  "nom": "2 Chroniques",
+  "abbr": "2 Ch",
+  "testament": "AT",
+  "ordre": 14,
+  "chapitres": 36,
+  "versets": 822
+ },
+ {
+  "id": "esdras",
+  "nom": "Esdras",
+  "abbr": "Esd",
+  "testament": "AT",
+  "ordre": 15,
+  "chapitres": 10,
+  "versets": 280
+ },
+ {
+  "id": "nehemie",
+  "nom": "Néhémie",
+  "abbr": "Ne",
+  "testament": "AT",
+  "ordre": 16,
+  "chapitres": 13,
+  "versets": 406
+ },
+ {
+  "id": "tobie",
+  "nom": "Tobie",
+  "abbr": "Tb",
+  "testament": "AT",
+  "ordre": 17,
+  "chapitres": 14,
+  "versets": 298
+ },
+ {
+  "id": "judith",
+  "nom": "Judith",
+  "abbr": "Jdt",
+  "testament": "AT",
+  "ordre": 18,
+  "chapitres": 16,
+  "versets": 346
+ },
+ {
+  "id": "esther",
+  "nom": "Esther",
+  "abbr": "Est",
+  "testament": "AT",
+  "ordre": 19,
+  "chapitres": 16,
+  "versets": 275
+ },
+ {
+  "id": "1_machabees",
+  "nom": "1 Machabées",
+  "abbr": "1 M",
+  "testament": "AT",
+  "ordre": 20,
+  "chapitres": 16,
+  "versets": 929
+ },
+ {
+  "id": "2_machabees",
+  "nom": "2 Machabées",
+  "abbr": "2 M",
+  "testament": "AT",
+  "ordre": 21,
+  "chapitres": 15,
+  "versets": 557
+ },
+ {
+  "id": "job",
+  "nom": "Job",
+  "abbr": "Jb",
+  "testament": "AT",
+  "ordre": 22,
+  "chapitres": 42,
+  "versets": 1070
+ },
+ {
+  "id": "psaumes",
+  "nom": "Psaumes",
+  "abbr": "Ps",
+  "testament": "AT",
+  "ordre": 23,
+  "chapitres": 150,
+  "versets": 2527
+ },
+ {
+  "id": "proverbes",
+  "nom": "Proverbes",
+  "abbr": "Pr",
+  "testament": "AT",
+  "ordre": 24,
+  "chapitres": 31,
+  "versets": 915
+ },
+ {
+  "id": "ecclesiaste",
+  "nom": "Ecclésiaste",
+  "abbr": "Qo",
+  "testament": "AT",
+  "ordre": 25,
+  "chapitres": 12,
+  "versets": 222
+ },
+ {
+  "id": "cantique",
+  "nom": "Cantique des cantiques",
+  "abbr": "Ct",
+  "testament": "AT",
+  "ordre": 26,
+  "chapitres": 8,
+  "versets": 117
+ },
+ {
+  "id": "sagesse",
+  "nom": "Sagesse",
+  "abbr": "Sg",
+  "testament": "AT",
+  "ordre": 27,
+  "chapitres": 19,
+  "versets": 437
+ },
+ {
+  "id": "ecclesiastique",
+  "nom": "Ecclésiastique",
+  "abbr": "Si",
+  "testament": "AT",
+  "ordre": 28,
+  "chapitres": 51,
+  "versets": 1363
+ },
+ {
+  "id": "isaie",
+  "nom": "Isaïe",
+  "abbr": "Is",
+  "testament": "AT",
+  "ordre": 29,
+  "chapitres": 66,
+  "versets": 1291
+ },
+ {
+  "id": "jeremie",
+  "nom": "Jérémie",
+  "abbr": "Jr",
+  "testament": "AT",
+  "ordre": 30,
+  "chapitres": 52,
+  "versets": 1364
+ },
+ {
+  "id": "lamentations",
+  "nom": "Lamentations",
+  "abbr": "Lm",
+  "testament": "AT",
+  "ordre": 31,
+  "chapitres": 5,
+  "versets": 154
+ },
+ {
+  "id": "baruch",
+  "nom": "Baruch",
+  "abbr": "Ba",
+  "testament": "AT",
+  "ordre": 32,
+  "chapitres": 6,
+  "versets": 213
+ },
+ {
+  "id": "ezechiel",
+  "nom": "Ézéchiel",
+  "abbr": "Ez",
+  "testament": "AT",
+  "ordre": 33,
+  "chapitres": 48,
+  "versets": 1273
+ },
+ {
+  "id": "daniel",
+  "nom": "Daniel",
+  "abbr": "Dn",
+  "testament": "AT",
+  "ordre": 34,
+  "chapitres": 14,
+  "versets": 531
+ },
+ {
+  "id": "osee",
+  "nom": "Osée",
+  "abbr": "Os",
+  "testament": "AT",
+  "ordre": 35,
+  "chapitres": 14,
+  "versets": 197
+ },
+ {
+  "id": "joel",
+  "nom": "Joël",
+  "abbr": "Jl",
+  "testament": "AT",
+  "ordre": 36,
+  "chapitres": 4,
+  "versets": 73
+ },
+ {
+  "id": "amos",
+  "nom": "Amos",
+  "abbr": "Am",
+  "testament": "AT",
+  "ordre": 37,
+  "chapitres": 9,
+  "versets": 146
+ },
+ {
+  "id": "abdias",
+  "nom": "Abdias",
+  "abbr": "Ab",
+  "testament": "AT",
+  "ordre": 38,
+  "chapitres": 1,
+  "versets": 21
+ },
+ {
+  "id": "jonas",
+  "nom": "Jonas",
+  "abbr": "Jon",
+  "testament": "AT",
+  "ordre": 39,
+  "chapitres": 4,
+  "versets": 48
+ },
+ {
+  "id": "michee",
+  "nom": "Michée",
+  "abbr": "Mi",
+  "testament": "AT",
+  "ordre": 40,
+  "chapitres": 7,
+  "versets": 105
+ },
+ {
+  "id": "nahum",
+  "nom": "Nahum",
+  "abbr": "Na",
+  "testament": "AT",
+  "ordre": 41,
+  "chapitres": 3,
+  "versets": 47
+ },
+ {
+  "id": "habacuc",
+  "nom": "Habacuc",
+  "abbr": "Ha",
+  "testament": "AT",
+  "ordre": 42,
+  "chapitres": 3,
+  "versets": 56
+ },
+ {
+  "id": "sophonie",
+  "nom": "Sophonie",
+  "abbr": "So",
+  "testament": "AT",
+  "ordre": 43,
+  "chapitres": 3,
+  "versets": 53
+ },
+ {
+  "id": "aggee",
+  "nom": "Aggée",
+  "abbr": "Ag",
+  "testament": "AT",
+  "ordre": 44,
+  "chapitres": 2,
+  "versets": 38
+ },
+ {
+  "id": "zacharie",
+  "nom": "Zacharie",
+  "abbr": "Za",
+  "testament": "AT",
+  "ordre": 45,
+  "chapitres": 14,
+  "versets": 211
+ },
+ {
+  "id": "malachie",
+  "nom": "Malachie",
+  "abbr": "Ml",
+  "testament": "AT",
+  "ordre": 46,
+  "chapitres": 3,
+  "versets": 55
+ },
+ {
+  "id": "matthieu",
+  "nom": "Évangile selon saint Matthieu",
+  "abbr": "Mt",
+  "testament": "NT",
+  "ordre": 47,
+  "chapitres": 28,
+  "versets": 1071
+ },
+ {
+  "id": "marc",
+  "nom": "Évangile selon saint Marc",
+  "abbr": "Mc",
+  "testament": "NT",
+  "ordre": 48,
+  "chapitres": 16,
+  "versets": 677
+ },
+ {
+  "id": "luc",
+  "nom": "Évangile selon saint Luc",
+  "abbr": "Lc",
+  "testament": "NT",
+  "ordre": 49,
+  "chapitres": 24,
+  "versets": 1151
+ },
+ {
+  "id": "jean",
+  "nom": "Évangile selon saint Jean",
+  "abbr": "Jn",
+  "testament": "NT",
+  "ordre": 50,
+  "chapitres": 21,
+  "versets": 879
+ },
+ {
+  "id": "actes",
+  "nom": "Actes des Apôtres",
+  "abbr": "Ac",
+  "testament": "NT",
+  "ordre": 51,
+  "chapitres": 28,
+  "versets": 1006
+ },
+ {
+  "id": "romains",
+  "nom": "Épître aux Romains",
+  "abbr": "Rm",
+  "testament": "NT",
+  "ordre": 52,
+  "chapitres": 16,
+  "versets": 433
+ },
+ {
+  "id": "1_corinthiens",
+  "nom": "1re Épître aux Corinthiens",
+  "abbr": "1 Co",
+  "testament": "NT",
+  "ordre": 53,
+  "chapitres": 16,
+  "versets": 437
+ },
+ {
+  "id": "2_corinthiens",
+  "nom": "2e Épître aux Corinthiens",
+  "abbr": "2 Co",
+  "testament": "NT",
+  "ordre": 54,
+  "chapitres": 13,
+  "versets": 256
+ },
+ {
+  "id": "galates",
+  "nom": "Épître aux Galates",
+  "abbr": "Ga",
+  "testament": "NT",
+  "ordre": 55,
+  "chapitres": 6,
+  "versets": 149
+ },
+ {
+  "id": "ephesiens",
+  "nom": "Épître aux Éphésiens",
+  "abbr": "Ep",
+  "testament": "NT",
+  "ordre": 56,
+  "chapitres": 6,
+  "versets": 155
+ },
+ {
+  "id": "philippiens",
+  "nom": "Épître aux Philippiens",
+  "abbr": "Ph",
+  "testament": "NT",
+  "ordre": 57,
+  "chapitres": 4,
+  "versets": 104
+ },
+ {
+  "id": "colossiens",
+  "nom": "Épître aux Colossiens",
+  "abbr": "Col",
+  "testament": "NT",
+  "ordre": 58,
+  "chapitres": 4,
+  "versets": 95
+ },
+ {
+  "id": "1_thessaloniciens",
+  "nom": "1re Épître aux Thessaloniciens",
+  "abbr": "1 Th",
+  "testament": "NT",
+  "ordre": 59,
+  "chapitres": 5,
+  "versets": 89
+ },
+ {
+  "id": "2_thessaloniciens",
+  "nom": "2e Épître aux Thessaloniciens",
+  "abbr": "2 Th",
+  "testament": "NT",
+  "ordre": 60,
+  "chapitres": 3,
+  "versets": 47
+ },
+ {
+  "id": "1_timothee",
+  "nom": "1re Épître à Timothée",
+  "abbr": "1 Tm",
+  "testament": "NT",
+  "ordre": 61,
+  "chapitres": 6,
+  "versets": 113
+ },
+ {
+  "id": "2_timothee",
+  "nom": "2e Épître à Timothée",
+  "abbr": "2 Tm",
+  "testament": "NT",
+  "ordre": 62,
+  "chapitres": 4,
+  "versets": 83
+ },
+ {
+  "id": "tite",
+  "nom": "Épître à Tite",
+  "abbr": "Tt",
+  "testament": "NT",
+  "ordre": 63,
+  "chapitres": 3,
+  "versets": 46
+ },
+ {
+  "id": "philemon",
+  "nom": "Épître à Philémon",
+  "abbr": "Phm",
+  "testament": "NT",
+  "ordre": 64,
+  "chapitres": 1,
+  "versets": 25
+ },
+ {
+  "id": "hebreux",
+  "nom": "Épître aux Hébreux",
+  "abbr": "He",
+  "testament": "NT",
+  "ordre": 65,
+  "chapitres": 13,
+  "versets": 303
+ },
+ {
+  "id": "jacques",
+  "nom": "Épître de saint Jacques",
+  "abbr": "Jc",
+  "testament": "NT",
+  "ordre": 66,
+  "chapitres": 5,
+  "versets": 108
+ },
+ {
+  "id": "1_pierre",
+  "nom": "1re Épître de saint Pierre",
+  "abbr": "1 P",
+  "testament": "NT",
+  "ordre": 67,
+  "chapitres": 5,
+  "versets": 105
+ },
+ {
+  "id": "2_pierre",
+  "nom": "2e Épître de saint Pierre",
+  "abbr": "2 P",
+  "testament": "NT",
+  "ordre": 68,
+  "chapitres": 3,
+  "versets": 61
+ },
+ {
+  "id": "1_jean",
+  "nom": "1re Épître de saint Jean",
+  "abbr": "1 Jn",
+  "testament": "NT",
+  "ordre": 69,
+  "chapitres": 5,
+  "versets": 105
+ },
+ {
+  "id": "2_jean",
+  "nom": "2e Épître de saint Jean",
+  "abbr": "2 Jn",
+  "testament": "NT",
+  "ordre": 70,
+  "chapitres": 1,
+  "versets": 13
+ },
+ {
+  "id": "3_jean",
+  "nom": "3e Épître de saint Jean",
+  "abbr": "3 Jn",
+  "testament": "NT",
+  "ordre": 71,
+  "chapitres": 1,
+  "versets": 15
+ },
+ {
+  "id": "jude",
+  "nom": "Épître de saint Jude",
+  "abbr": "Jude",
+  "testament": "NT",
+  "ordre": 72,
+  "chapitres": 1,
+  "versets": 25
+ },
+ {
+  "id": "apocalypse",
+  "nom": "Apocalypse",
+  "abbr": "Ap",
+  "testament": "NT",
+  "ordre": 73,
+  "chapitres": 22,
+  "versets": 405
+ }
+]

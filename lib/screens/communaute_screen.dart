@@ -391,6 +391,14 @@ class CommunauteScreen extends StatelessWidget {
   /// Le vote est le geste d'engagement le moins coûteux qui existe — un appui,
   /// et l'on voit aussitôt où se situe la communauté. La carte disparaît tant
   /// qu'aucun sondage n'est publié, plutôt que d'afficher un cadre vide.
+  /// Dates de rencontre d'une fratie, l'ancien champ unique servant de
+  /// repli pour les documents semés avant que la liste n'existe.
+  List<String> _prochainesRencontres(Fraternity fraternite) {
+    if (fraternite.rencontres.isNotEmpty) return fraternite.rencontres;
+    if (fraternite.nextMeetingDate.isNotEmpty) return [fraternite.nextMeetingDate];
+    return const [];
+  }
+
   Widget _buildSondage(BuildContext context) {
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
@@ -836,23 +844,42 @@ class CommunauteScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    const Text("Prochaine rencontre", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                    const Text("Prochaines rencontres", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                     const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.calendar_today, size: 12, color: Color(0xFF5B4FC8)),
-                        const SizedBox(width: 5),
-                        Expanded(child: Text(fraternity.nextMeetingDate, style: const TextStyle(fontSize: 12, color: Colors.grey), overflow: TextOverflow.ellipsis)),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF5B4FC8)),
-                        const SizedBox(width: 5),
-                        Expanded(child: Text(fraternity.nextMeetingLocation, style: const TextStyle(fontSize: 12, color: Colors.grey))),
-                      ],
-                    ),
+                    // Deux rencontres par mois, saisies par un responsable :
+                    // sans date renseignée, on le dit plutôt que d'afficher
+                    // une ligne vide.
+                    if (_prochainesRencontres(fraternity).isEmpty)
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 12, color: Colors.grey),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              "Deux fois par mois · dates à venir",
+                              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    for (final date in _prochainesRencontres(fraternity)) ...[
+                      Row(
+                        children: [
+                          const Icon(Icons.calendar_today, size: 12, color: Color(0xFF5B4FC8)),
+                          const SizedBox(width: 5),
+                          Expanded(child: Text(date, style: const TextStyle(fontSize: 12, color: Colors.grey), overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                    ],
+                    if (fraternity.nextMeetingLocation.isNotEmpty)
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF5B4FC8)),
+                          const SizedBox(width: 5),
+                          Expanded(child: Text(fraternity.nextMeetingLocation, style: const TextStyle(fontSize: 12, color: Colors.grey))),
+                        ],
+                      ),
                     const SizedBox(height: 15),
                     SizedBox(
                       width: double.infinity,

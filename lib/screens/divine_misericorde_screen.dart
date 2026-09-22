@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -432,14 +434,25 @@ class _DivineMisericordeScreenState extends State<DivineMisericordeScreen> {
   }
 }
 
+/// Place d'un grain sur le chapelet. Le type dit à la fois sa taille et la
+/// partie du chapelet où il se trouve : la queue qui pend sous la croix, la
+/// couronne des cinq dizaines, ou la médaille de jonction.
+enum _Grain { croix, ouvertureGros, ouverturePetit, dizaineGros, dizainePetit, medaille }
+
 /// Une étape du chapelet : un texte, répété autant de fois que le grain le
 /// demande (dix pour les petits grains d'une dizaine, trois pour le Trisagion).
 class _EtapeChapelet {
   final String titre;
   final String texte;
   final int repetitions;
+  final _Grain grain;
 
-  const _EtapeChapelet(this.titre, this.texte, {this.repetitions = 1});
+  const _EtapeChapelet(
+    this.titre,
+    this.texte, {
+    this.repetitions = 1,
+    required this.grain,
+  });
 }
 
 /// Chapelet de la Divine Miséricorde, guidé grain par grain.
@@ -454,10 +467,31 @@ class ChapeletMisericordeScreen extends StatefulWidget {
   State<ChapeletMisericordeScreen> createState() => _ChapeletMisericordeScreenState();
 }
 
-class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
+class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen>
+    with SingleTickerProviderStateMixin {
   static const Color _violet = Color(0xFF5B4FC8);
 
   late final List<_EtapeChapelet> _etapes = _construireEtapes();
+
+  /// Le grain en cours respire doucement : c'est ce battement qui dit où on en
+  /// est, sans avoir à lire le compteur.
+  late final AnimationController _souffle = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  /// Un type de grain par grain réellement prié : les répétitions d'une étape
+  /// deviennent autant de grains distincts sur le chapelet.
+  late final List<_Grain> _grains = [
+    for (final etape in _etapes)
+      for (var i = 0; i < etape.repetitions; i++) etape.grain,
+  ];
+
+  @override
+  void dispose() {
+    _souffle.dispose();
+    super.dispose();
+  }
 
   int _index = 0;
 
@@ -478,6 +512,7 @@ class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
       const _EtapeChapelet(
         "Signe de croix",
         "Au nom du Père, et du Fils, et du Saint-Esprit. Amen.",
+        grain: _Grain.croix,
       ),
       const _EtapeChapelet(
         "Notre Père",
@@ -485,12 +520,14 @@ class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
         "que ta volonté soit faite sur la terre comme au ciel. Donne-nous aujourd'hui notre pain de ce jour. "
         "Pardonne-nous nos offenses, comme nous pardonnons aussi à ceux qui nous ont offensés. "
         "Et ne nous laisse pas entrer en tentation, mais délivre-nous du Mal. Amen.",
+        grain: _Grain.ouvertureGros,
       ),
       const _EtapeChapelet(
         "Je vous salue Marie",
         "Je vous salue Marie, pleine de grâce, le Seigneur est avec vous. "
         "Vous êtes bénie entre toutes les femmes et Jésus, le fruit de vos entrailles, est béni. "
         "Sainte Marie, Mère de Dieu, priez pour nous pauvres pécheurs, maintenant et à l'heure de notre mort. Amen.",
+        grain: _Grain.ouverturePetit,
       ),
       const _EtapeChapelet(
         "Je crois en Dieu",
@@ -501,22 +538,27 @@ class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
         "est assis à la droite de Dieu le Père tout-puissant, d'où il viendra juger les vivants et les morts. "
         "Je crois en l'Esprit Saint, à la sainte Église catholique, à la communion des saints, "
         "à la rémission des péchés, à la résurrection de la chair, à la vie éternelle. Amen.",
+        grain: _Grain.ouverturePetit,
       ),
       // Cinq dizaines : un gros grain, puis dix petits.
       for (var dizaine = 1; dizaine <= 5; dizaine++) ...[
-        _EtapeChapelet("$dizaineᵉ dizaine · gros grain", _perePeternel),
-        _EtapeChapelet("$dizaineᵉ dizaine · petits grains", _douloureusePassion, repetitions: 10),
+        _EtapeChapelet("$dizaineᵉ dizaine · gros grain", _perePeternel,
+            grain: _Grain.dizaineGros),
+        _EtapeChapelet("$dizaineᵉ dizaine · petits grains", _douloureusePassion,
+            repetitions: 10, grain: _Grain.dizainePetit),
       ],
       const _EtapeChapelet(
         "Pour conclure",
         "Dieu Saint, Dieu Fort, Dieu Éternel, prends pitié de nous et du monde entier.",
         repetitions: 3,
+        grain: _Grain.medaille,
       ),
       const _EtapeChapelet(
         "Prière finale",
         "Ô Sang et Eau qui avez jailli du Cœur de Jésus comme source de miséricorde pour nous, "
         "j'ai confiance en toi.",
         repetitions: 3,
+        grain: _Grain.medaille,
       ),
     ];
   }
@@ -641,7 +683,9 @@ class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
                           : "Grain ${_grainsFaits + 1} sur $_totalGrains",
                       style: const TextStyle(color: Colors.grey, fontSize: 12),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 8),
+                    _buildChapelet(),
+                    const SizedBox(height: 16),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(20),
@@ -661,10 +705,6 @@ class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
                         style: const TextStyle(fontSize: 16, height: 1.7, color: Color(0xFF0F172A)),
                       ),
                     ),
-                    if (etape.repetitions > 1) ...[
-                      const SizedBox(height: 20),
-                      _buildGrains(etape.repetitions),
-                    ],
                   ],
                 ),
               ),
@@ -725,24 +765,231 @@ class _ChapeletMisericordeScreenState extends State<ChapeletMisericordeScreen> {
     );
   }
 
-  /// Chapelet des dix petits grains, pour situer le grain en cours d'un
-  /// coup d'œil sans compter les répétitions.
-  Widget _buildGrains(int total) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: List.generate(total, (i) {
-        final fait = i < _repetition;
-        return Container(
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: fait ? _violet : Colors.transparent,
-            border: Border.all(color: fait ? _violet : Colors.grey.shade400, width: 1.5),
+  /// Le chapelet dessine : couronne des cinq dizaines, queue sous la croix,
+  /// et le grain en cours qui s'allume.
+  Widget _buildChapelet() {
+    return AnimatedBuilder(
+      animation: _souffle,
+      builder: (context, _) {
+        return SizedBox(
+          height: 230,
+          width: double.infinity,
+          child: CustomPaint(
+            painter: _PeintreChapelet(
+              grains: _grains,
+              courant: _grainsFaits,
+              souffle: Curves.easeInOut.transform(_souffle.value),
+              couleur: _violet,
+            ),
           ),
         );
-      }),
+      },
     );
   }
+}
+
+/// Dessine le chapelet et y situe le grain en cours.
+///
+/// Les grains ne sont pas places a la main : leur position se deduit de la
+/// liste des grains pries, si bien que changer les etapes du chapelet change
+/// le dessin sans y toucher.
+class _PeintreChapelet extends CustomPainter {
+  final List<_Grain> grains;
+
+  /// Index du grain en cours dans [grains].
+  final int courant;
+
+  /// Battement du grain en cours, de 0 a 1.
+  final double souffle;
+
+  final Color couleur;
+
+  _PeintreChapelet({
+    required this.grains,
+    required this.courant,
+    required this.souffle,
+    required this.couleur,
+  });
+
+  /// Ecart entre deux grains de la queue.
+  static const double _ecartQueue = 17;
+
+  static const Color _grisFil = Color(0xFFD1D5DB);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final queue = <int>[];
+    final couronne = <int>[];
+    final medaille = <int>[];
+    for (var i = 0; i < grains.length; i++) {
+      switch (grains[i]) {
+        case _Grain.croix:
+        case _Grain.ouvertureGros:
+        case _Grain.ouverturePetit:
+          queue.add(i);
+        case _Grain.dizaineGros:
+        case _Grain.dizainePetit:
+          couronne.add(i);
+        case _Grain.medaille:
+          medaille.add(i);
+      }
+    }
+
+    final hauteurQueue = _ecartQueue * (queue.length + 1);
+    final rayon = math.min(
+      size.width / 2 - 16,
+      (size.height - hauteurQueue - 16) / 2,
+    );
+    if (rayon <= 0) return;
+
+    final centre = Offset(size.width / 2, 8 + rayon);
+    final jonction = Offset(centre.dx, centre.dy + rayon);
+
+    final fil = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..color = _grisFil;
+
+    canvas.drawCircle(centre, rayon, fil);
+    canvas.drawLine(jonction, Offset(jonction.dx, jonction.dy + hauteurQueue), fil);
+
+    // La couronne part de la jonction et tourne dans le sens des aiguilles.
+    for (var rang = 0; rang < couronne.length; rang++) {
+      final angle = math.pi / 2 + (rang + 1) / (couronne.length + 1) * 2 * math.pi;
+      final position = Offset(
+        centre.dx + rayon * math.cos(angle),
+        centre.dy + rayon * math.sin(angle),
+      );
+      _grain(canvas, position, couronne[rang]);
+    }
+
+    // La queue se prie de bas en haut : la croix en premier, tout en bas.
+    for (var rang = 0; rang < queue.length; rang++) {
+      final depuisLeBas = queue.length - rang;
+      final position = Offset(
+        jonction.dx,
+        jonction.dy + _ecartQueue * depuisLeBas,
+      );
+      if (grains[queue[rang]] == _Grain.croix) {
+        _croix(canvas, position, queue[rang]);
+      } else {
+        _grain(canvas, position, queue[rang]);
+      }
+    }
+
+    // Trisagion et priere finale se disent sur la medaille de jonction.
+    _medaille(canvas, jonction, medaille);
+  }
+
+  /// Etat d'un grain : fait, en cours, ou a venir.
+  ({bool fait, bool actif}) _etat(int index) =>
+      (fait: index < courant, actif: index == courant);
+
+  void _grain(Canvas canvas, Offset centre, int index) {
+    final gros = grains[index] == _Grain.dizaineGros ||
+        grains[index] == _Grain.ouvertureGros;
+    final rayon = gros ? 7.0 : 4.6;
+    final etat = _etat(index);
+
+    if (etat.actif) {
+      canvas.drawCircle(
+        centre,
+        rayon + 4 + 4 * souffle,
+        Paint()..color = couleur.withOpacity(0.15 + 0.2 * souffle),
+      );
+    }
+
+    if (etat.fait || etat.actif) {
+      canvas.drawCircle(centre, rayon, Paint()..color = couleur);
+    } else {
+      canvas.drawCircle(centre, rayon, Paint()..color = Colors.white);
+      canvas.drawCircle(
+        centre,
+        rayon,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = _grisFil,
+      );
+    }
+  }
+
+  void _croix(Canvas canvas, Offset centre, int index) {
+    final etat = _etat(index);
+    final teinte = (etat.fait || etat.actif) ? couleur : _grisFil;
+
+    if (etat.actif) {
+      canvas.drawCircle(
+        centre,
+        11 + 4 * souffle,
+        Paint()..color = couleur.withOpacity(0.15 + 0.2 * souffle),
+      );
+    }
+
+    final trait = Paint()
+      ..color = teinte
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(centre.dx, centre.dy - 9),
+      Offset(centre.dx, centre.dy + 9),
+      trait,
+    );
+    canvas.drawLine(
+      Offset(centre.dx - 6, centre.dy - 3),
+      Offset(centre.dx + 6, centre.dy - 3),
+      trait,
+    );
+  }
+
+  /// La medaille porte les six invocations de la fin. Elle se remplit au fur
+  /// et a mesure, ce qui evite de dessiner six grains la ou le chapelet n'en
+  /// a qu'un.
+  void _medaille(Canvas canvas, Offset centre, List<int> index) {
+    if (index.isEmpty) return;
+
+    final faits = index.where((i) => i < courant).length;
+    final active = index.contains(courant);
+    final rectangle = Rect.fromCenter(center: centre, width: 15, height: 19);
+    final forme = RRect.fromRectAndRadius(rectangle, const Radius.circular(7));
+
+    if (active) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rectangle.inflate(3 + 3 * souffle), const Radius.circular(10)),
+        Paint()..color = couleur.withOpacity(0.15 + 0.2 * souffle),
+      );
+    }
+
+    canvas.drawRRect(forme, Paint()..color = Colors.white);
+
+    if (faits > 0) {
+      final part = faits / index.length;
+      canvas.save();
+      canvas.clipRRect(forme);
+      canvas.drawRect(
+        Rect.fromLTRB(
+          rectangle.left,
+          rectangle.bottom - rectangle.height * part,
+          rectangle.right,
+          rectangle.bottom,
+        ),
+        Paint()..color = couleur,
+      );
+      canvas.restore();
+    }
+
+    canvas.drawRRect(
+      forme,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5
+        ..color = (faits > 0 || active) ? couleur : _grisFil,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_PeintreChapelet ancien) =>
+      ancien.courant != courant ||
+      ancien.souffle != souffle ||
+      ancien.grains.length != grains.length;
 }

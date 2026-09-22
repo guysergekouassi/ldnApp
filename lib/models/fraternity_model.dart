@@ -1,8 +1,15 @@
-/// Un groupe local : fratrie de quartier, groupe de prière, équipe de jeunes…
+/// Une fratie de la communauté : Saint Michel, Divin Amour, Saint François,
+/// Sacré-Cœur, Sainte Faustine.
+///
+/// « Fratie » est le mot de la communauté : c'est celui qui s'affiche, et non
+/// « fraternité » ni « fratrie ».
 ///
 /// Le modèle s'appelle encore `Fraternity` parce que la collection Firestore
-/// `fraternities` porte ce nom depuis la première version ; il décrit
-/// désormais tous les types de groupes proposés dans « Rejoins un groupe ».
+/// `fraternities` porte ce nom depuis la première version.
+///
+/// Il n'y a plus de catégories de groupes : la communauté a cinq fraties
+/// nommées, que l'on rejoint par leur nom. Classer cinq entrées par type
+/// n'aidait personne et laissait croire à un annuaire qui s'étoffe.
 class Fraternity {
   final String id;
   final String name;
@@ -15,8 +22,12 @@ class Fraternity {
   /// le document semé par les premières versions ne les porte pas.
   final String description;
 
-  /// Clé de [TypeGroupe.libelles]. Vide si le groupe n'est pas classé.
-  final String type;
+  /// Dates des prochaines rencontres, saisies à la main dans Firestore : la
+  /// communauté se retrouve deux fois par mois, à des dates qui changent.
+  ///
+  /// Vide tant que personne ne les a renseignées. L'app le dit alors
+  /// franchement plutôt que d'afficher une date inventée ou périmée.
+  final List<String> rencontres;
 
   /// Faux quand le groupe est complet ou ne prend plus d'inscriptions.
   final bool ouvert;
@@ -29,7 +40,7 @@ class Fraternity {
     required this.nextMeetingDate,
     required this.nextMeetingLocation,
     this.description = '',
-    this.type = '',
+    this.rencontres = const [],
     this.ouvert = true,
   });
 
@@ -42,35 +53,14 @@ class Fraternity {
       nextMeetingDate: data['nextMeetingDate'] ?? '',
       nextMeetingLocation: data['nextMeetingLocation'] ?? '',
       description: (data['description'] ?? '').toString().trim(),
-      type: (data['type'] ?? '').toString().trim(),
+      rencontres: (data['rencontres'] as List?)
+              ?.map((d) => d.toString().trim())
+              .where((d) => d.isNotEmpty)
+              .toList() ??
+          const [],
       // Un groupe sans le champ est considéré ouvert : c'était le
       // comportement avant que le champ n'existe.
       ouvert: data['ouvert'] ?? true,
     );
   }
-}
-
-/// Familles de groupes proposées dans l'annuaire.
-class TypeGroupe {
-  static const Map<String, String> libelles = {
-    'fratrie': 'Fratrie de quartier',
-    'priere': 'Groupe de prière',
-    'jeunes': 'Jeunes & étudiants',
-    'couples': 'Couples & familles',
-    'service': 'Équipe de service',
-    'ligne': 'En ligne',
-  };
-
-  static const Map<String, String> icones = {
-    'fratrie': 'people_outline',
-    'priere': 'volunteer_activism',
-    'jeunes': 'school_outlined',
-    'couples': 'favorite_border',
-    'service': 'handshake_outlined',
-    'ligne': 'wifi',
-  };
-
-  static String libelle(String cle) => libelles[cle] ?? 'Groupe';
-
-  static String icone(String cle) => icones[cle] ?? 'people_outline';
 }

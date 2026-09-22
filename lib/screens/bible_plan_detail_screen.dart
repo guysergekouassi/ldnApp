@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../models/bible_plan_model.dart';
+import '../models/bible_model.dart';
+import '../services/bible_service.dart';
 import '../services/firestore_service.dart';
 import '../services/share_service.dart';
+import 'bible_lecture_screen.dart';
 
 /// Détail d'un plan de lecture : les jours, leur référence, et le suivi.
 class BiblePlanDetailScreen extends StatefulWidget {
@@ -49,6 +52,39 @@ class _BiblePlanDetailScreenState extends State<BiblePlanDetailScreen> {
             },
           );
         },
+      ),
+    );
+  }
+
+  /// Ouvre le texte biblique à partir d'une référence de plan (« Mc 1,1-20 »).
+  ///
+  /// La référence est découpée en livre et chapitre : le reste (versets,
+  /// intervalles) ne sert qu'à la lecture humaine, l'écran ouvrant le
+  /// chapitre entier. Si le livre n'est pas reconnu, on le dit plutôt que
+  /// d'ouvrir un texte au hasard.
+  Future<void> _ouvrirLeTexte(String reference) async {
+    final decoupe = RegExp(r'^\s*([1-3]?\s*[A-Za-zÀ-ÿ\.]+)\s*(\d+)?')
+        .firstMatch(reference);
+    final nomDuLivre = decoupe?.group(1)?.replaceAll('.', '').trim();
+
+    LivreBiblique? livre;
+    if (nomDuLivre != null && nomDuLivre.isNotEmpty) {
+      livre = await BibleService.instance.chercher(nomDuLivre);
+    }
+
+    if (!mounted) return;
+    if (livre == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Livre introuvable dans la Bible : $reference")),
+      );
+      return;
+    }
+
+    final chapitre = int.tryParse(decoupe?.group(2) ?? '') ?? 1;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BibleLectureScreen(livre: livre!, chapitreInitial: chapitre),
       ),
     );
   }
@@ -267,13 +303,24 @@ class _BiblePlanDetailScreenState extends State<BiblePlanDetailScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  lecture.reference,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: lu ? Colors.grey : const Color(0xFF0F172A),
-                    decoration: lu ? TextDecoration.lineThrough : null,
+                InkWell(
+                  onTap: () => _ouvrirLeTexte(lecture.reference),
+                  child: Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          lecture.reference,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: lu ? Colors.grey : const Color(0xFF0F172A),
+                            decoration: lu ? TextDecoration.lineThrough : null,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(Icons.menu_book, size: 13, color: Colors.grey.shade500),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 5),
