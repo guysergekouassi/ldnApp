@@ -3,12 +3,21 @@ import '../services/firestore_service.dart';
 import '../models/neuvaine_model.dart';
 import 'neuvaines_screen.dart';
 
-class NeuvainesListScreen extends StatelessWidget {
+class NeuvainesListScreen extends StatefulWidget {
   const NeuvainesListScreen({Key? key}) : super(key: key);
 
   @override
+  State<NeuvainesListScreen> createState() => _NeuvainesListScreenState();
+}
+
+class _NeuvainesListScreenState extends State<NeuvainesListScreen> {
+  final FirestoreService _firestoreService = FirestoreService();
+
+  /// Intention sélectionnée, ou null pour « Toutes ».
+  String? _intentionFiltre;
+
+  @override
   Widget build(BuildContext context) {
-    final FirestoreService _firestoreService = FirestoreService();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -48,16 +57,83 @@ class NeuvainesListScreen extends StatelessWidget {
                     );
                   }
 
+                  // On ne propose que les intentions réellement présentes :
+                  // un filtre qui ne renvoie rien est pire que pas de filtre.
+                  final intentionsDisponibles = <String>{
+                    for (final n in neuvaines) ...n.intentions,
+                  }.toList()
+                    ..sort((a, b) => NeuvaineTaxonomie.libelleIntention(a)
+                        .compareTo(NeuvaineTaxonomie.libelleIntention(b)));
+
+                  final visibles = _intentionFiltre == null
+                      ? neuvaines
+                      : neuvaines
+                          .where((n) => n.intentions.contains(_intentionFiltre))
+                          .toList();
+
                   return Column(
                     children: [
                       const SizedBox(height: 20),
-                      ...neuvaines.map((neuvaine) => _buildNeuvaineCard(context, neuvaine)).toList(),
+                      if (intentionsDisponibles.length > 1)
+                        _buildFiltres(intentionsDisponibles),
+                      if (visibles.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(40.0),
+                          child: Text(
+                            "Aucune neuvaine pour cette intention.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey, fontSize: 15),
+                          ),
+                        )
+                      else
+                        ...visibles.map((neuvaine) => _buildNeuvaineCard(context, neuvaine)),
                       const SizedBox(height: 40),
                     ],
                   );
                 },
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Chips d'intention. Défilement horizontal : la liste s'allongera avec le
+  /// catalogue, et doit tenir sur un écran étroit sans déborder.
+  Widget _buildFiltres(List<String> intentions) {
+    Widget chip(String label, String? valeur) {
+      final actif = _intentionFiltre == valeur;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: ChoiceChip(
+          label: Text(label, style: TextStyle(
+            fontSize: 12,
+            fontWeight: actif ? FontWeight.bold : FontWeight.normal,
+            color: actif ? Colors.white : const Color(0xFF0F172A),
+          )),
+          selected: actif,
+          onSelected: (_) => setState(() => _intentionFiltre = actif ? null : valeur),
+          selectedColor: Colors.orange,
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: BorderSide(color: actif ? Colors.orange : Colors.grey.shade300),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: SizedBox(
+        height: 40,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            chip("Toutes", null),
+            for (final i in intentions)
+              chip(NeuvaineTaxonomie.libelleIntention(i), i),
           ],
         ),
       ),
@@ -79,7 +155,9 @@ class NeuvainesListScreen extends StatelessWidget {
           ),
         ),
         Container(
-          height: 250,
+          // Hauteur minimale et non figée : avec un texte agrandi par les
+          // réglages système, le contenu débordait de l'en-tête.
+          constraints: const BoxConstraints(minHeight: 250),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(

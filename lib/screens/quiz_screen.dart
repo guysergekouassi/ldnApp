@@ -256,8 +256,7 @@ class _QuizScreenState extends State<QuizScreen> {
               children: [
                 Text(
                   "Question ${_currentIndex + 1}/${_questions.length}",
-                  style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold),
-                ),
+                  style: const TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                 if (widget.mode.secondesParQuestion != null) ...[
                   const SizedBox(width: 12),
                   _buildChrono(),
@@ -359,8 +358,7 @@ class _QuizScreenState extends State<QuizScreen> {
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color: urgence ? Colors.red : Colors.orange,
-            ),
-          ),
+            ), maxLines: 1, overflow: TextOverflow.ellipsis),
         ],
       ),
     );

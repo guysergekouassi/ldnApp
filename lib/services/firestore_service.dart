@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/chapelet_mystery_model.dart';
@@ -25,6 +26,15 @@ import 'quiz_catalogue.dart';
 import 'parcours_catalogue.dart';
 import 'versets_catalogue.dart';
 import '../models/favori_model.dart';
+import '../models/temoignage_model.dart';
+import '../models/bible_plan_model.dart';
+import 'bible_plans_catalogue.dart';
+import '../models/discipline_model.dart';
+import '../models/sondage_model.dart';
+import '../models/parcours_avis_model.dart';
+import '../models/besoin_aide_model.dart';
+import '../models/demande_ecoute_model.dart';
+import 'besoins_catalogue.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -72,6 +82,7 @@ class FirestoreService {
       {'title': "Neuvaines", 'duration': "9 jours", 'imageAsset': "assets/images/bible.png.jpg", 'iconName': "local_fire_department_outlined", 'colorHex': "#FFA500", 'action': "neuvaines", 'order': 4},
       {'title': "Préparation à\nla Confession", 'duration': "12 min", 'imageAsset': "assets/sunset_bg.jpg", 'iconName': "add", 'colorHex': "#E99D1A", 'action': "confession", 'order': 5},
       {'title': "Intentions de\nla Semaine", 'duration': "5 min", 'imageAsset': "assets/hands_heart.png", 'iconName': "favorite_border", 'colorHex': "#C72127", 'action': "intentions", 'order': 6},
+      ..._activitesAjoutees,
     ];
 
     for (final activity in activities) {
@@ -235,13 +246,17 @@ class FirestoreService {
     });
   }
 
-  Future<void> toggleLikePost(String postId) async {
-    // In a real app, we would track which user liked which post to toggle correctly.
-    // For simplicity, we just increment here or we can use a subcollection.
-    // Let's just increment for now as a simple example.
-    await _db.collection('posts').doc(postId).update({
-      'likes': FieldValue.increment(1),
-    });
+  /// Ajoute ou retire le « j'aime » du membre sur une publication.
+  /// Renvoie true s'il vient d'aimer, false s'il a retiré son « j'aime ».
+  ///
+  /// Le compteur n'était auparavant qu'incrémenté : un même membre pouvait le
+  /// faire monter indéfiniment et ne pouvait jamais revenir en arrière.
+  Future<bool> toggleLikePost(String postId) {
+    return _basculerJaime(
+      cible: _db.collection('posts').doc(postId),
+      sousCollection: 'likedPosts',
+      documentId: postId,
+    );
   }
 
   /// Intentions communautaires, de la plus récente à la plus ancienne.
@@ -456,25 +471,18 @@ class FirestoreService {
     }
   }
 
-  Stream<Fraternity?> getFraternity() {
-    return _db.collection('fraternities').limit(1).snapshots().map((snapshot) {
-      if (snapshot.docs.isNotEmpty) {
-        return Fraternity.fromFirestore(snapshot.docs.first.data(), snapshot.docs.first.id);
-      }
-      return null;
-    });
-  }
-
+  /// Amorce l'annuaire des groupes.
+  ///
+  /// Les premières versions ne semaient qu'une seule fratrie, avec un effectif
+  /// inventé : l'onglet « Rejoins un groupe » n'aurait eu qu'une ligne, et son
+  /// compteur de membres n'aurait correspondu à personne. On sème désormais
+  /// tout l'annuaire, à zéro membre.
   Future<void> checkAndInitializeFraternity() async {
     final snapshot = await _db.collection('fraternities').limit(1).get();
-    if (snapshot.docs.isEmpty) {
-      await _db.collection('fraternities').add({
-        "name": "Fratrie Cocody",
-        "location": "Abidjan, Côte d'Ivoire",
-        "memberCount": 45,
-        "nextMeetingDate": "Samedi 25 Mai à 17h00",
-        "nextMeetingLocation": "Centre JEP Cocody",
-      });
+    if (snapshot.docs.isNotEmpty) return;
+
+    for (final groupe in _groupesLivres) {
+      await _db.collection('fraternities').add(groupe);
     }
   }
 
@@ -496,6 +504,8 @@ class FirestoreService {
       {
         "title": "Neuvaine à Marie",
         "subtitle": "qui défait les nœuds",
+        "recipient": "marie",
+        "intentions": ["situations_bloquees"],
         "description": "Priez cette neuvaine pour confier à la Vierge Marie les situations difficiles, les blocages et les souffrances de votre vie afin qu'elle les dénoue avec son amour maternel.",
         "imageUrl": "assets/mary_praying.png",
         "category": "marian",
@@ -515,6 +525,8 @@ class FirestoreService {
       {
         "title": "Neuvaine au Saint-Esprit",
         "subtitle": "Pour demander les 7 dons",
+        "recipient": "esprit",
+        "intentions": ["discernement"],
         "description": "La plus ancienne de toutes les neuvaines. Elle se prie traditionnellement entre l'Ascension et la Pentecôte pour invoquer l'Esprit Consolateur et recevoir les sept dons divins.",
         "imageUrl": "assets/sunset_bg.jpg",
         "category": "pentecostal",
@@ -534,6 +546,8 @@ class FirestoreService {
       {
         "title": "Neuvaine à Saint Michel",
         "subtitle": "Archange protecteur",
+        "recipient": "saints",
+        "intentions": ["protection"],
         "description": "Neuvaine pour invoquer la protection de Saint Michel Archange contre les forces du mal et pour obtenir le courage spirituel.",
         "imageUrl": "assets/saint_michael.png",
         "category": "archangel",
@@ -553,6 +567,8 @@ class FirestoreService {
       {
         "title": "Neuvaine à Saint Antoine",
         "subtitle": "Pour retrouver l'amour et les miracles",
+        "recipient": "saints",
+        "intentions": ["miracles"],
         "description": "Neuvaine traditionnelle pour invoquer Saint Antoine de Padoue, saint des miracles, pour retrouver ce qui est perdu et obtenir son intercession.",
         "imageUrl": "assets/saint_anthony.png",
         "category": "saint",
@@ -572,6 +588,8 @@ class FirestoreService {
       {
         "title": "Neuvaine au Sacré-Cœur",
         "subtitle": "De Jésus",
+        "recipient": "jesus",
+        "intentions": ["conversion"],
         "description": "Neuvaine traditionnelle pour vénérer le Sacré-Cœur de Jésus et obtenir les grâces de conversion, d'amour et de rédemption.",
         "imageUrl": "assets/sacred_heart.png",
         "category": "christological",
@@ -591,6 +609,8 @@ class FirestoreService {
       {
         "title": "Neuvaine à Sainte Thérèse",
         "subtitle": "De l'Enfant Jésus",
+        "recipient": "saints",
+        "intentions": ["confiance"],
         "description": "Neuvaine à la petite docteur de l'Église pour obtenir son intercession et la grâce de sa « petite voie » d'amour enfantin.",
         "imageUrl": "assets/saint_therese.png",
         "category": "saint",
@@ -610,6 +630,8 @@ class FirestoreService {
       {
         "title": "Neuvaine à Notre-Dame",
         "subtitle": "De Lourdes",
+        "recipient": "marie",
+        "intentions": ["guerison"],
         "description": "Neuvaine à la Vierge Marie telle qu'elle s'est manifestée à Lourdes, pour demander les guérisons spirituelles et physiques.",
         "imageUrl": "assets/notre_dame_lourdes.png",
         "category": "marian",
@@ -629,6 +651,8 @@ class FirestoreService {
       {
         "title": "Neuvaine à Saint Jude",
         "subtitle": "Thaddée - Des causes impossibles",
+        "recipient": "saints",
+        "intentions": ["causes_desesperees"],
         "description": "Neuvaine pour invoquer Saint Jude Thaddée, apôtre de Jésus, patron des causes difficiles et désespérées, pour obtenir son aide dans les situations sans espoir.",
         "imageUrl": "assets/saint_jude.png",
         "category": "saint",
@@ -1714,6 +1738,104 @@ class FirestoreService {
     });
   }
 
+  // --- Migrations de contenu ---------------------------------------------
+  //
+  // Les routines `checkAndInitialize…` ne font rien si leur collection existe
+  // déjà : elles amorcent un compte neuf, jamais un compte en place. Tout
+  // champ ajouté après coup manquerait donc indéfiniment aux installations
+  // existantes. Ces migrations comblent ce trou.
+
+  /// Classification des neuvaines livrées, reprise du seed.
+  ///
+  /// Dupliquée ici à dessein : le seed décrit des documents à créer, la
+  /// migration des champs à compléter sur des documents déjà en base.
+  static const Map<String, Map<String, dynamic>> _classificationNeuvaines = {
+    "Neuvaine à Marie": {"recipient": "marie", "intentions": ["situations_bloquees"]},
+    "Neuvaine au Saint-Esprit": {"recipient": "esprit", "intentions": ["discernement"]},
+    "Neuvaine à Saint Michel": {"recipient": "saints", "intentions": ["protection"]},
+    "Neuvaine à Saint Antoine": {"recipient": "saints", "intentions": ["miracles"]},
+    "Neuvaine au Sacré-Cœur": {"recipient": "jesus", "intentions": ["conversion"]},
+    "Neuvaine à Sainte Thérèse": {"recipient": "saints", "intentions": ["confiance"]},
+    "Neuvaine à Notre-Dame": {"recipient": "marie", "intentions": ["guerison"]},
+    "Neuvaine à Saint Jude": {"recipient": "saints", "intentions": ["causes_desesperees"]},
+  };
+
+  /// Met à jour les documents de contenu déjà en base.
+  ///
+  /// Idempotente : chaque document n'est écrit que s'il lui manque vraiment
+  /// quelque chose, donc un second passage n'émet aucune écriture. Les échecs
+  /// sont avalés : ces collections sont souvent en lecture seule côté client,
+  /// et un refus de règles ne doit pas empêcher l'application de démarrer.
+  Future<void> appliquerMigrationsContenu() async {
+    await _migrerActionsEtapesDuJour();
+    await _migrerClassificationNeuvaines();
+    await _migrerNouvellesActivitesDePriere();
+    await _migrerNeuvaineDivineMisericorde();
+    await _migrerAnnuaireDesGroupes();
+  }
+
+  /// Étapes du parcours du jour qui ont reçu un écran après coup. Leur action
+  /// était vide : les toucher cochait la case sans rien ouvrir.
+  static const Map<String, String> _actionsEtapesJour = {
+    'Examen du soir': 'examen',
+    'Méditation': 'meditation',
+  };
+
+  Future<void> _migrerActionsEtapesDuJour() async {
+    try {
+      final snapshot = await _db
+          .collection('daily_tasks')
+          .where('title', whereIn: _actionsEtapesJour.keys.toList())
+          .get();
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final action = (data['action'] ?? '').toString().trim();
+        // Une action déjà posée (y compris modifiée à la main) est respectée.
+        if (action.isNotEmpty) continue;
+
+        final attendue = _actionsEtapesJour[(data['title'] ?? '').toString().trim()];
+        if (attendue == null) continue;
+        await doc.reference.update({'action': attendue});
+      }
+    } catch (e) {
+      debugPrint("Migration des actions du parcours impossible : $e");
+    }
+  }
+
+  /// Les neuvaines créées avant l'ajout de la classification n'ont ni
+  /// `recipient` ni `intentions` : sans eux, les filtres restent invisibles.
+  Future<void> _migrerClassificationNeuvaines() async {
+    try {
+      final snapshot = await _db.collection('neuvaines').get();
+      if (snapshot.docs.isEmpty) return;
+
+      final batch = _db.batch();
+      var aEcrire = 0;
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final dejaClassee = (data['recipient'] ?? '').toString().trim().isNotEmpty &&
+            data['intentions'] is List &&
+            (data['intentions'] as List).isNotEmpty;
+        if (dejaClassee) continue;
+
+        final titre = (data['title'] ?? '').toString().trim();
+        final classification = _classificationNeuvaines[titre];
+        // Une neuvaine ajoutée à la main n'est pas dans la table : on la laisse
+        // telle quelle plutôt que de lui inventer une catégorie.
+        if (classification == null) continue;
+
+        batch.update(doc.reference, classification);
+        aEcrire++;
+      }
+
+      if (aEcrire > 0) await batch.commit();
+    } catch (e) {
+      debugPrint("Migration de la classification des neuvaines impossible : $e");
+    }
+  }
+
   Future<void> checkAndInitializeDailyTasks() async {
     final snapshot = await _db.collection('daily_tasks').limit(1).get();
     if (snapshot.docs.isNotEmpty) return;
@@ -1722,8 +1844,8 @@ class FirestoreService {
       {"title": "Prière du matin", "icon": "wb_sunny_outlined", "action": "", "order": 1},
       {"title": "Lecture de l'Évangile", "icon": "menu_book", "action": "evangile", "order": 2},
       {"title": "Chapelet", "icon": "circle_outlined", "action": "chapelet", "order": 3},
-      {"title": "Méditation", "icon": "favorite_border", "action": "", "order": 4},
-      {"title": "Examen du soir", "icon": "nightlight_round", "action": "", "order": 5},
+      {"title": "Méditation", "icon": "favorite_border", "action": "meditation", "order": 4},
+      {"title": "Examen du soir", "icon": "nightlight_round", "action": "examen", "order": 5},
     ];
 
     for (var task in tasks) {
@@ -1845,5 +1967,1175 @@ class FirestoreService {
 
     await addFavori(uid, favori);
     return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Défis : participation et progression jour par jour
+  // ---------------------------------------------------------------------------
+
+  CollectionReference<Map<String, dynamic>> _challengesUtilisateur(String uid) =>
+      _db.collection('users').doc(uid).collection('challenges');
+
+  /// Défis rejoints par le membre, du plus récemment rejoint au plus ancien.
+  Stream<List<ChallengeProgress>> getUserChallenges(String uid) {
+    return _challengesUtilisateur(uid).snapshots().map((snapshot) {
+      final defis = snapshot.docs
+          .map((doc) => ChallengeProgress.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      // Tri côté client : un `orderBy('joinedAt')` écarterait la participation
+      // tout juste créée, tant que le serveur n'a pas posé l'horodatage.
+      defis.sort((a, b) {
+        final dateA = a.joinedAt;
+        final dateB = b.joinedAt;
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return -1;
+        if (dateB == null) return 1;
+        return dateB.compareTo(dateA);
+      });
+      return defis;
+    });
+  }
+
+  /// Défi actuellement suivi : le plus récent parmi ceux qui ne sont pas
+  /// terminés. Nul si le membre n'en suit aucun.
+  Stream<ChallengeProgress?> getChallengeEnCours(String uid) {
+    return getUserChallenges(uid).map((defis) {
+      for (final defi in defis) {
+        if (!defi.isCompleted) return defi;
+      }
+      return null;
+    });
+  }
+
+  /// Inscrit le membre au défi. Sans effet s'il l'a déjà rejoint : le compteur
+  /// public de participants ne doit pas gonfler à chaque appui.
+  Future<bool> rejoindreChallenge(String uid, Challenge challenge) async {
+    final ref = _challengesUtilisateur(uid).doc(challenge.id);
+    if ((await ref.get()).exists) return false;
+
+    await ref.set({
+      'title': challenge.title,
+      'subtitle': challenge.subtitle,
+      'durationDays': challenge.durationDays,
+      'completedDays': <String>[],
+      'isCompleted': false,
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
+    await incrementChallengeParticipants(challenge.id);
+    return true;
+  }
+
+  Future<void> quitterChallenge(String uid, String challengeId) async {
+    await _challengesUtilisateur(uid).doc(challengeId).delete();
+  }
+
+  /// Valide la journée en cours pour un défi. Renvoie false si elle l'était
+  /// déjà : la transaction garantit qu'un double appui ne compte qu'une fois.
+  Future<bool> validerJourChallenge(String uid, String challengeId, {DateTime? jour}) {
+    final ref = _challengesUtilisateur(uid).doc(challengeId);
+    final cle = dayKey(jour ?? DateTime.now());
+
+    return _db.runTransaction<bool>((transaction) async {
+      final snapshot = await transaction.get(ref);
+      if (!snapshot.exists) return false;
+
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final jours = List<String>.from(data['completedDays'] ?? const <String>[]);
+      if (jours.contains(cle)) return false;
+
+      jours.add(cle);
+      final duree = (data['durationDays'] ?? 0) as int;
+
+      transaction.update(ref, {
+        'completedDays': jours,
+        'isCompleted': duree > 0 && jours.length >= duree,
+        'lastValidatedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Intentions épinglées
+  // ---------------------------------------------------------------------------
+
+  CollectionReference<Map<String, dynamic>> _intentionsEpinglees(String uid) =>
+      _db.collection('users').doc(uid).collection('pinnedIntentions');
+
+  /// Identifiants des intentions épinglées par le membre.
+  Stream<Set<String>> getPinnedIntentionIds(String uid) {
+    return _intentionsEpinglees(uid)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
+  }
+
+  /// Épingle l'intention si elle ne l'est pas, la désépingle sinon.
+  /// Renvoie true si elle vient d'être épinglée.
+  Future<bool> togglePinIntention(String uid, String intentionId) async {
+    final ref = _intentionsEpinglees(uid).doc(intentionId);
+    if ((await ref.get()).exists) {
+      await ref.delete();
+      return false;
+    }
+    await ref.set({'pinnedAt': FieldValue.serverTimestamp()});
+    return true;
+  }
+
+  /// Remonte les intentions épinglées en tête sans toucher à l'ordre relatif
+  /// des autres. On partitionne plutôt que de trier : `List.sort` n'est pas
+  /// stable en Dart et rebattrait l'ordre chronologique existant.
+  static List<Intention> trierAvecEpinglees(
+    List<Intention> intentions,
+    Set<String> epinglees,
+  ) {
+    if (epinglees.isEmpty) return intentions;
+    return [
+      ...intentions.where((i) => epinglees.contains(i.id)),
+      ...intentions.where((i) => !epinglees.contains(i.id)),
+    ];
+  }
+
+  // ---------------------------------------------------------------------------
+  // Témoignages
+  // ---------------------------------------------------------------------------
+
+  /// Témoignages publiés, du plus récent au plus ancien.
+  ///
+  /// Comme pour les intentions, le tri est fait côté client : un `orderBy`
+  /// masquerait le témoignage que le membre vient tout juste de déposer.
+  Stream<List<Temoignage>> getTemoignages() {
+    return _db.collection('temoignages').snapshots().map((snapshot) {
+      final temoignages = snapshot.docs
+          .map((doc) => Temoignage.fromFirestore(doc.data(), doc.id))
+          .where((t) => t.isApproved)
+          .toList();
+
+      temoignages.sort((a, b) {
+        final dateA = a.createdAt;
+        final dateB = b.createdAt;
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return -1;
+        if (dateB == null) return 1;
+        return dateB.compareTo(dateA);
+      });
+      return temoignages;
+    });
+  }
+
+  Future<void> addTemoignage(String title, String content) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    String authorName = user.displayName ?? '';
+    String authorAvatarUrl = '';
+
+    final data = (await _db.collection('users').doc(user.uid).get()).data();
+    if (data != null) {
+      if ((data['fullName'] ?? '').toString().isNotEmpty) {
+        authorName = data['fullName'].toString();
+      }
+      if ((data['photoUrl'] ?? '').toString().isNotEmpty) {
+        authorAvatarUrl = data['photoUrl'].toString();
+      }
+    }
+    if (authorName.trim().isEmpty) authorName = 'Un membre';
+
+    await _db.collection('temoignages').add({
+      'authorUid': user.uid,
+      'authorName': authorName,
+      'authorAvatarUrl': authorAvatarUrl,
+      'title': title.trim(),
+      'content': content.trim(),
+      'likes': 0,
+      'isApproved': true,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Retire un témoignage. Le garde-fou sur l'auteur est un confort
+  /// d'interface : il doit être rejoué par les règles de sécurité Firestore.
+  Future<void> deleteTemoignage(String temoignageId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final ref = _db.collection('temoignages').doc(temoignageId);
+    final snapshot = await ref.get();
+    if (snapshot.data()?['authorUid'] != user.uid) return;
+    await ref.delete();
+  }
+
+  Stream<Set<String>> getLikedTemoignageIds() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return Stream.value(<String>{});
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('likedTemoignages')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
+  }
+
+  Future<bool> toggleLikeTemoignage(String temoignageId) {
+    return _basculerJaime(
+      cible: _db.collection('temoignages').doc(temoignageId),
+      sousCollection: 'likedTemoignages',
+      documentId: temoignageId,
+    );
+  }
+
+  // Les témoignages ne sont pas amorcés : ils viennent des membres.
+  //
+  // Une première version semait trois témoignages inventés, attribués à des
+  // prénoms fictifs. Affichés tels quels, ils se seraient fait passer pour la
+  // parole de vrais membres — et les règles de sécurité les refusaient de
+  // toute façon, puisqu'un témoignage doit être signé par son auteur. Le mur
+  // s'ouvre donc vide, avec une invitation à témoigner.
+
+  // ---------------------------------------------------------------------------
+  // « J'aime » : un seul par membre et par contenu
+  // ---------------------------------------------------------------------------
+
+  /// Publications aimées par le membre connecté.
+  Stream<Set<String>> getLikedPostIds() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return Stream.value(<String>{});
+
+    return _db
+        .collection('users')
+        .doc(user.uid)
+        .collection('likedPosts')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => doc.id).toSet());
+  }
+
+  /// Bascule commune aux publications et aux témoignages : le « j'aime » est
+  /// tracé sous le compte du membre, ce qui le rend réversible et non
+  /// cumulable, et le compteur public suit dans la même transaction.
+  Future<bool> _basculerJaime({
+    required DocumentReference<Map<String, dynamic>> cible,
+    required String sousCollection,
+    required String documentId,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    final marqueur = _db
+        .collection('users')
+        .doc(user.uid)
+        .collection(sousCollection)
+        .doc(documentId);
+
+    return _db.runTransaction<bool>((transaction) async {
+      // Dans une transaction, toutes les lectures précèdent les écritures.
+      final contenu = await transaction.get(cible);
+      if (!contenu.exists) return false;
+      final dejaAime = (await transaction.get(marqueur)).exists;
+
+      final compteur = ((contenu.data()?['likes'] ?? 0) as num).toInt();
+
+      if (dejaAime) {
+        transaction.delete(marqueur);
+        // Le compteur ne peut pas passer sous zéro : les « j'aime » posés avant
+        // ce suivi par membre n'ont pas de marqueur correspondant.
+        transaction.update(cible, {'likes': compteur > 0 ? compteur - 1 : 0});
+        return false;
+      }
+
+      transaction.set(marqueur, {'likedAt': FieldValue.serverTimestamp()});
+      transaction.update(cible, {'likes': compteur + 1});
+      return true;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Plans de lecture de la Bible
+  // ---------------------------------------------------------------------------
+
+  Stream<List<BiblePlan>> getBiblePlans() {
+    return _db.collection('bible_plans').snapshots().map((snapshot) {
+      final plans = snapshot.docs
+          .map((doc) => BiblePlan.fromFirestore(doc.data(), doc.id))
+          .where((plan) => plan.readings.isNotEmpty)
+          .toList();
+      plans.sort((a, b) => a.order.compareTo(b.order));
+      return plans;
+    });
+  }
+
+  Stream<BiblePlan?> getBiblePlan(String planId) {
+    return _db.collection('bible_plans').doc(planId).snapshots().map((doc) {
+      final data = doc.data();
+      if (!doc.exists || data == null) return null;
+      return BiblePlan.fromFirestore(data, doc.id);
+    });
+  }
+
+  /// Amorce les plans de lecture, et complète ceux dont le contenu manque.
+  ///
+  /// Contrairement aux autres amorçages, on ne s'arrête pas à « la collection
+  /// est non vide » : un plan ajouté au catalogue dans une version ultérieure
+  /// doit apparaître chez les installations existantes.
+  Future<void> checkAndInitializeBiblePlans() async {
+    try {
+      for (final plan in plansDeLecture) {
+        final ref = _db.collection('bible_plans').doc(plan.id);
+        final existant = await ref.get();
+
+        final lecturesEnBase = (existant.data()?['readings'] as List?)?.length ?? 0;
+        // Un plan déjà complet est laissé tel quel : le contenu retouché
+        // depuis la console ne doit pas être écrasé à chaque lancement.
+        if (existant.exists && lecturesEnBase >= plan.jours.length) continue;
+
+        await ref.set({
+          'title': plan.titre,
+          'subtitle': plan.sousTitre,
+          'description': plan.description,
+          'imageAsset': plan.imageAsset,
+          'colorHex': plan.couleurHex,
+          'order': plan.ordre,
+          'readings': plan.jours
+              .map((j) => {'dayNumber': j.jour, 'reference': j.reference, 'focus': j.focus})
+              .toList(),
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      debugPrint("Amorçage des plans de lecture impossible : $e");
+    }
+  }
+
+  CollectionReference<Map<String, dynamic>> _biblePlansUtilisateur(String uid) =>
+      _db.collection('users').doc(uid).collection('biblePlans');
+
+  Stream<List<BiblePlanProgress>> getUserBiblePlans(String uid) {
+    return _biblePlansUtilisateur(uid).snapshots().map((snapshot) {
+      final plans = snapshot.docs
+          .map((doc) => BiblePlanProgress.fromFirestore(doc.data(), doc.id))
+          .toList();
+      plans.sort((a, b) {
+        final dateA = a.startedAt;
+        final dateB = b.startedAt;
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return -1;
+        if (dateB == null) return 1;
+        return dateB.compareTo(dateA);
+      });
+      return plans;
+    });
+  }
+
+  Stream<BiblePlanProgress?> getBiblePlanProgress(String uid, String planId) {
+    return _biblePlansUtilisateur(uid).doc(planId).snapshots().map((doc) {
+      final data = doc.data();
+      if (!doc.exists || data == null) return null;
+      return BiblePlanProgress.fromFirestore(data, doc.id);
+    });
+  }
+
+  /// Plan de lecture en cours : le plus récemment commencé parmi ceux qui ne
+  /// sont pas terminés.
+  Stream<BiblePlanProgress?> getBiblePlanEnCours(String uid) {
+    return getUserBiblePlans(uid).map((plans) {
+      for (final plan in plans) {
+        if (!plan.isCompleted) return plan;
+      }
+      return null;
+    });
+  }
+
+  /// Inscrit le membre au plan. Sans effet s'il l'a déjà commencé : sa
+  /// progression ne doit pas être remise à zéro par un second appui.
+  Future<bool> demarrerBiblePlan(String uid, BiblePlan plan) async {
+    final ref = _biblePlansUtilisateur(uid).doc(plan.id);
+    if ((await ref.get()).exists) return false;
+
+    await ref.set({
+      'title': plan.title,
+      'durationDays': plan.durationDays,
+      'completedDays': <int>[],
+      'isCompleted': false,
+      'startedAt': FieldValue.serverTimestamp(),
+    });
+    return true;
+  }
+
+  Future<void> quitterBiblePlan(String uid, String planId) async {
+    await _biblePlansUtilisateur(uid).doc(planId).delete();
+  }
+
+  /// Marque une journée comme lue, ou revient dessus. Renvoie true si la
+  /// journée vient d'être cochée.
+  ///
+  /// La transaction garde `isCompleted` cohérent avec la liste des jours :
+  /// décocher un jour rouvre un plan déjà terminé.
+  Future<bool> toggleJourLecture(String uid, String planId, int jour) {
+    final ref = _biblePlansUtilisateur(uid).doc(planId);
+
+    return _db.runTransaction<bool>((transaction) async {
+      final snapshot = await transaction.get(ref);
+      if (!snapshot.exists) return false;
+
+      final data = snapshot.data() ?? <String, dynamic>{};
+      final jours = (data['completedDays'] as List? ?? const [])
+          .map((e) => int.tryParse(e.toString()) ?? 0)
+          .where((e) => e > 0)
+          .toSet();
+
+      final ajoute = !jours.contains(jour);
+      if (ajoute) {
+        jours.add(jour);
+      } else {
+        jours.remove(jour);
+      }
+
+      final duree = (data['durationDays'] ?? 0) as int;
+      final liste = jours.toList()..sort();
+
+      transaction.update(ref, {
+        'completedDays': liste,
+        'isCompleted': duree > 0 && liste.length >= duree,
+        'lastReadAt': FieldValue.serverTimestamp(),
+      });
+      return ajoute;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contenus ajoutés après la première version
+  // ---------------------------------------------------------------------------
+
+  /// Activités de « Prions ensemble » ajoutées après l'amorçage initial.
+  ///
+  /// `checkAndInitializePrayerActivities` ne sème que sur une collection vide :
+  /// sans cette migration, les installations existantes ne verraient jamais
+  /// les nouvelles propositions.
+  static const List<Map<String, dynamic>> _activitesAjoutees = [
+    {
+      'title': "Divine\nMiséricorde",
+      'duration': "15 min",
+      'imageAsset': "assets/images/chapelet.png.jpg",
+      'iconName': "favorite_border",
+      'colorHex': "#5B4FC8",
+      'action': "misericorde",
+      'order': 7,
+    },
+    {
+      'title': "Lecture de\nla Bible",
+      'duration': "10 min",
+      'imageAsset': "assets/images/bible.png.jpg",
+      'iconName': "menu_book",
+      'colorHex': "#16A34A",
+      'action': "bible",
+      'order': 8,
+    },
+  ];
+
+  Future<void> _migrerNouvellesActivitesDePriere() async {
+    try {
+      final existantes = await _db.collection('prayer_activities').get();
+      // Une collection vide relève de l'amorçage initial, pas de la migration.
+      if (existantes.docs.isEmpty) return;
+
+      final actions = existantes.docs
+          .map((doc) => (doc.data()['action'] ?? '').toString().trim())
+          .toSet();
+
+      for (final activite in _activitesAjoutees) {
+        if (actions.contains(activite['action'])) continue;
+        await _db.collection('prayer_activities').add(activite);
+      }
+    } catch (e) {
+      debugPrint("Ajout des nouvelles activités de prière impossible : $e");
+    }
+  }
+
+  /// Ajoute la neuvaine à la Divine Miséricorde aux installations qui ont été
+  /// amorcées avant qu'elle n'existe.
+  Future<void> _migrerNeuvaineDivineMisericorde() async {
+    try {
+      final existantes = await _db.collection('neuvaines').get();
+      if (existantes.docs.isEmpty) return; // amorçage initial, rien à migrer
+
+      final titres = existantes.docs
+          .map((doc) => (doc.data()['title'] ?? '').toString().trim())
+          .toSet();
+      if (titres.contains(_neuvaineDivineMisericorde['title'])) return;
+
+      await _db.collection('neuvaines').add(_neuvaineDivineMisericorde);
+    } catch (e) {
+      debugPrint("Ajout de la neuvaine à la Divine Miséricorde impossible : $e");
+    }
+  }
+
+  /// Neuvaine à la Divine Miséricorde, sur les neuf intentions confiées par
+  /// Jésus à sainte Faustine (Petit Journal, 1209-1229).
+  static const Map<String, dynamic> _neuvaineDivineMisericorde = {
+    "title": "Neuvaine à la Divine Miséricorde",
+    "subtitle": "Jésus, j'ai confiance en Toi",
+    "recipient": "jesus",
+    "intentions": ["confiance", "conversion", "guerison"],
+    "description":
+        "Les neuf intentions que Jésus a confiées à sainte Faustine, à prier du Vendredi saint "
+        "au samedi qui précède la fête de la Divine Miséricorde — ou à tout autre moment de l'année. "
+        "Chaque jour, une catégorie d'âmes est présentée au Père.",
+    "imageUrl": "assets/images/chapelet.png.jpg",
+    "category": "misericorde",
+    "duration": 9,
+    "days": [
+      {
+        "dayNumber": 1,
+        "title": "Jour 1 : Toute l'humanité, et les pécheurs",
+        "prayerText":
+            "Aujourd'hui, amène-moi toute l'humanité, et spécialement tous les pécheurs, et plonge-les dans l'océan de ma miséricorde.\n\nÔ Jésus très miséricordieux, dont le propre est d'avoir pitié de nous et de nous pardonner, ne regarde pas nos péchés, mais notre confiance en ton infinie bonté. Accueille-nous tous dans la demeure de ton Cœur très compatissant, et ne nous en laisse jamais sortir. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 2,
+        "title": "Jour 2 : Les prêtres et les religieux",
+        "prayerText":
+            "Aujourd'hui, amène-moi les âmes des prêtres et des religieux, et plonge-les dans mon insondable miséricorde.\n\nÔ Jésus très miséricordieux, de qui vient tout ce qui est bon, augmente en nous la grâce, afin que nous accomplissions dignement les œuvres de miséricorde. Que ceux qui nous voient glorifient le Père des miséricordes qui est aux cieux. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 3,
+        "title": "Jour 3 : Les âmes pieuses et fidèles",
+        "prayerText":
+            "Aujourd'hui, amène-moi toutes les âmes pieuses et fidèles, et plonge-les dans l'océan de ma miséricorde ; ce sont elles qui m'ont consolé sur le chemin de la croix.\n\nÔ Jésus très miséricordieux, tu dispenses à tous les trésors de ta miséricorde. Reçois-nous dans la demeure de ton Cœur très compatissant, et que la force de ton amour nous garde fidèles jusqu'au bout. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 4,
+        "title": "Jour 4 : Ceux qui ne connaissent pas encore Jésus",
+        "prayerText":
+            "Aujourd'hui, amène-moi ceux qui ne croient pas en Dieu et ceux qui ne me connaissent pas encore. J'ai pensé à eux aussi durant ma douloureuse Passion, et leur zèle futur a consolé mon Cœur.\n\nÔ Jésus très compatissant, tu es la lumière du monde entier. Accueille dans la demeure de ton Cœur très miséricordieux ceux qui ne te connaissent pas encore ; que les rayons de ta grâce les éclairent. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 5,
+        "title": "Jour 5 : Nos frères séparés",
+        "prayerText":
+            "Aujourd'hui, amène-moi les âmes de ceux qui se sont séparés de mon Église, et plonge-les dans l'océan de ma miséricorde.\n\nÔ Jésus très miséricordieux, tu es la bonté même ; tu ne refuses pas ta lumière à ceux qui te la demandent. Accueille dans la demeure de ton Cœur très compatissant ceux qui sont séparés, et ramène-les à l'unité de l'Église. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 6,
+        "title": "Jour 6 : Les cœurs doux et humbles, et les enfants",
+        "prayerText":
+            "Aujourd'hui, amène-moi les âmes douces et humbles, et les âmes des petits enfants, et plonge-les dans ma miséricorde. Ce sont elles qui ressemblent le plus à mon Cœur.\n\nÔ Jésus très miséricordieux, tu as dit toi-même : « Apprenez de moi que je suis doux et humble de cœur. » Accueille dans la demeure de ton Cœur les âmes douces et humbles, et les petits enfants. Le ciel entier s'émerveille d'elles. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 7,
+        "title": "Jour 7 : Ceux qui vénèrent la Miséricorde",
+        "prayerText":
+            "Aujourd'hui, amène-moi les âmes qui vénèrent et glorifient tout spécialement ma miséricorde, et plonge-les dans ma miséricorde.\n\nÔ Jésus très miséricordieux, dont le Cœur est l'amour même, accueille dans la demeure de ton Cœur les âmes qui glorifient et exaltent ta miséricorde. Fortes de la puissance de Dieu, qu'elles avancent sans crainte au milieu des épreuves. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 8,
+        "title": "Jour 8 : Les âmes du purgatoire",
+        "prayerText":
+            "Aujourd'hui, amène-moi les âmes qui sont dans la prison du purgatoire, et plonge-les dans l'abîme de ma miséricorde ; que les flots de mon sang rafraîchissent leur ardeur.\n\nÔ Jésus très miséricordieux, toi qui as dit vouloir la miséricorde, j'introduis dans la demeure de ton Cœur les âmes du purgatoire, que tu aimes et qui pourtant expient. Que les flots de ton sang apaisent le feu qui les purifie. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      },
+      {
+        "dayNumber": 9,
+        "title": "Jour 9 : Les âmes tièdes",
+        "prayerText":
+            "Aujourd'hui, amène-moi les âmes tièdes, et plonge-les dans l'abîme de ma miséricorde. Ce sont ces âmes qui blessent le plus douloureusement mon Cœur.\n\nÔ Jésus très compatissant, tu es la compassion même. J'introduis dans la demeure de ton Cœur les âmes tièdes. Que le feu de ton amour pur les embrase et leur rende la ferveur qu'elles ont perdue. Amen.\n\n(Prier ensuite le chapelet de la Divine Miséricorde.)"
+      }
+    ]
+  };
+
+  // ---------------------------------------------------------------------------
+  // Règle de vie : engagements choisis et fidélité
+  // ---------------------------------------------------------------------------
+
+  DocumentReference<Map<String, dynamic>> _disciplineRef(String uid) =>
+      _db.collection('users').doc(uid).collection('stats').doc('discipline');
+
+  Stream<DisciplineMembre> getDiscipline(String uid) {
+    return _disciplineRef(uid)
+        .snapshots()
+        .map((doc) => DisciplineMembre.fromFirestore(doc.data()));
+  }
+
+  /// Enregistre la règle de vie choisie. La liste remplace l'ancienne : c'est
+  /// bien un choix d'ensemble, pas une accumulation.
+  Future<void> enregistrerDiscipline(String uid, List<String> engagementIds) async {
+    await _disciplineRef(uid).set({
+      'engagements': engagementIds,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  CollectionReference<Map<String, dynamic>> _disciplineProgressRef(String uid) =>
+      _db.collection('users').doc(uid).collection('discipline_progress');
+
+  Stream<List<String>> getDisciplineDuJour(String uid, String jour) {
+    return _disciplineProgressRef(uid).doc(jour).snapshots().map(
+          (doc) => JourneeDiscipline.fromFirestore(doc.data(), doc.id).engagementsTenus,
+        );
+  }
+
+  Future<void> toggleEngagementDuJour(
+    String uid,
+    String jour,
+    String engagementId,
+    bool tenu,
+  ) async {
+    await _disciplineProgressRef(uid).doc(jour).set({
+      'engagements': tenu
+          ? FieldValue.arrayUnion([engagementId])
+          : FieldValue.arrayRemove([engagementId]),
+      'date': jour,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// Nombre de jours où chaque engagement a été tenu, sur la fenêtre la plus
+  /// récente de [jours] journées enregistrées.
+  ///
+  /// Les documents sont nommés par la date (`AAAA-MM-JJ`), donc un tri sur
+  /// l'identifiant suffit à remonter les plus récents — sans index ni champ
+  /// de tri supplémentaire.
+  Stream<Map<String, int>> getFideliteDiscipline(String uid, {int jours = 30}) {
+    return _disciplineProgressRef(uid)
+        .orderBy(FieldPath.documentId, descending: true)
+        .limit(jours)
+        .snapshots()
+        .map((snapshot) {
+      final compte = <String, int>{};
+      for (final doc in snapshot.docs) {
+        final journee = JourneeDiscipline.fromFirestore(doc.data(), doc.id);
+        for (final id in journee.engagementsTenus) {
+          compte[id] = (compte[id] ?? 0) + 1;
+        }
+      }
+      return compte;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Groupes locaux
+  // ---------------------------------------------------------------------------
+
+  Stream<List<Fraternity>> getGroupes() {
+    return _db.collection('fraternities').snapshots().map((snapshot) {
+      final groupes = snapshot.docs
+          .map((doc) => Fraternity.fromFirestore(doc.data(), doc.id))
+          .toList();
+      // Les groupes ouverts d'abord, puis par nom : un annuaire se parcourt,
+      // il n'a pas de raison de suivre l'ordre d'insertion.
+      groupes.sort((a, b) {
+        if (a.ouvert != b.ouvert) return a.ouvert ? -1 : 1;
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+      return groupes;
+    });
+  }
+
+  CollectionReference<Map<String, dynamic>> _groupesUtilisateur(String uid) =>
+      _db.collection('users').doc(uid).collection('groupes');
+
+  /// Groupe rejoint par le membre, ou null. On n'en garde qu'un : appartenir à
+  /// une communauté locale n'a de sens que si l'on sait laquelle.
+  Stream<String?> getMonGroupeId(String uid) {
+    return _groupesUtilisateur(uid).limit(1).snapshots().map(
+          (snapshot) => snapshot.docs.isEmpty ? null : snapshot.docs.first.id,
+        );
+  }
+
+  /// Inscrit le membre au groupe et met à jour l'effectif affiché.
+  ///
+  /// Un membre déjà inscrit ailleurs quitte d'abord son groupe précédent, pour
+  /// que les compteurs restent justes.
+  Future<bool> rejoindreGroupe(String uid, Fraternity groupe) async {
+    final dejaInscrit = await _groupesUtilisateur(uid).get();
+    for (final doc in dejaInscrit.docs) {
+      if (doc.id == groupe.id) return false;
+      await quitterGroupe(uid, doc.id);
+    }
+
+    await _groupesUtilisateur(uid).doc(groupe.id).set({
+      'name': groupe.name,
+      'location': groupe.location,
+      'joinedAt': FieldValue.serverTimestamp(),
+    });
+
+    try {
+      await _db.collection('fraternities').doc(groupe.id).update({
+        'memberCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      // L'appartenance est enregistrée : un compteur public non mis à jour
+      // n'est pas une raison de faire échouer l'inscription.
+      debugPrint("Compteur du groupe non mis à jour : $e");
+    }
+    return true;
+  }
+
+  Future<void> quitterGroupe(String uid, String groupeId) async {
+    final ref = _groupesUtilisateur(uid).doc(groupeId);
+    if (!(await ref.get()).exists) return;
+
+    await ref.delete();
+    try {
+      await _db.collection('fraternities').doc(groupeId).update({
+        'memberCount': FieldValue.increment(-1),
+      });
+    } catch (e) {
+      debugPrint("Compteur du groupe non mis à jour : $e");
+    }
+  }
+
+  /// Complète l'annuaire des groupes.
+  ///
+  /// La première version ne semait qu'une seule fratrie, sans description ni
+  /// type : l'annuaire n'aurait eu qu'une ligne. On ajoute les groupes
+  /// manquants par leur nom, et on classe l'existant sans l'écraser.
+  Future<void> _migrerAnnuaireDesGroupes() async {
+    try {
+      final existants = await _db.collection('fraternities').get();
+      if (existants.docs.isEmpty) return; // amorçage initial, rien à migrer
+
+      final noms = <String, DocumentReference<Map<String, dynamic>>>{};
+      for (final doc in existants.docs) {
+        noms[(doc.data()['name'] ?? '').toString().trim()] = doc.reference;
+      }
+
+      for (final groupe in _groupesLivres) {
+        final nom = groupe['name'] as String;
+        final ref = noms[nom];
+
+        if (ref == null) {
+          await _db.collection('fraternities').add(groupe);
+          continue;
+        }
+
+        // Groupe déjà présent : on ne pose que les champs de classement qui
+        // lui manquent, sans toucher à son effectif ni à ses rencontres.
+        final data = existants.docs.firstWhere((d) => d.reference == ref).data();
+        final manquants = <String, dynamic>{};
+        if ((data['type'] ?? '').toString().trim().isEmpty) {
+          manquants['type'] = groupe['type'];
+        }
+        if ((data['description'] ?? '').toString().trim().isEmpty) {
+          manquants['description'] = groupe['description'];
+        }
+        if (data['ouvert'] == null) manquants['ouvert'] = true;
+        if (manquants.isNotEmpty) await ref.update(manquants);
+      }
+    } catch (e) {
+      debugPrint("Mise à jour de l'annuaire des groupes impossible : $e");
+    }
+  }
+
+  static const List<Map<String, dynamic>> _groupesLivres = [
+    {
+      "name": "Fratrie Cocody",
+      "location": "Abidjan, Côte d'Ivoire",
+      "type": "fratrie",
+      "description": "Partage de la Parole et prière fraternelle, tous les samedis après-midi.",
+      "memberCount": 0,
+      "ouvert": true,
+      "nextMeetingDate": "Samedi, 17h00",
+      "nextMeetingLocation": "Centre JEP Cocody",
+    },
+    {
+      "name": "Groupe de prière Marcory",
+      "location": "Abidjan, Côte d'Ivoire",
+      "type": "priere",
+      "description": "Louange, intercession et adoration. Ouvert à tous, sans inscription préalable.",
+      "memberCount": 0,
+      "ouvert": true,
+      "nextMeetingDate": "Mercredi, 19h00",
+      "nextMeetingLocation": "Paroisse Saint-Jean, Marcory",
+    },
+    {
+      "name": "Jeunes & étudiants",
+      "location": "Abidjan, Côte d'Ivoire",
+      "type": "jeunes",
+      "description": "Pour les 18-30 ans : enseignement, discussion libre et temps de prière.",
+      "memberCount": 0,
+      "ouvert": true,
+      "nextMeetingDate": "Vendredi, 18h30",
+      "nextMeetingLocation": "Aumônerie universitaire",
+    },
+    {
+      "name": "Couples & familles",
+      "location": "Abidjan, Côte d'Ivoire",
+      "type": "couples",
+      "description": "Un dimanche par mois, pour prier et échanger sur la vie de famille.",
+      "memberCount": 0,
+      "ouvert": true,
+      "nextMeetingDate": "1er dimanche du mois, 16h00",
+      "nextMeetingLocation": "Centre JEP Cocody",
+    },
+    {
+      "name": "Équipe de service",
+      "location": "Abidjan, Côte d'Ivoire",
+      "type": "service",
+      "description": "Visites aux malades, distribution alimentaire, soutien scolaire.",
+      "memberCount": 0,
+      "ouvert": true,
+      "nextMeetingDate": "Samedi, 9h00",
+      "nextMeetingLocation": "Sur le terrain",
+    },
+    {
+      "name": "Fratrie en ligne",
+      "location": "Partout",
+      "type": "ligne",
+      "description": "Pour ceux qui n'ont pas de groupe près de chez eux : prière commune en visio.",
+      "memberCount": 0,
+      "ouvert": true,
+      "nextMeetingDate": "Mardi, 20h00",
+      "nextMeetingLocation": "Lien envoyé aux inscrits",
+    },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // Sondage de la semaine
+  // ---------------------------------------------------------------------------
+
+  /// Clé de la semaine, au format `AAAA-Snn`, alignée sur le lundi.
+  static String semaineKey([DateTime? date]) {
+    final jour = date ?? DateTime.now();
+    final lundi = DateTime(jour.year, jour.month, jour.day)
+        .subtract(Duration(days: jour.weekday - 1));
+    // Numéro de semaine ISO approché : le rang du lundi dans l'année suffit à
+    // obtenir une clé stable et croissante, ce qu'on attend ici.
+    final rang = ((lundi.difference(DateTime(lundi.year, 1, 1)).inDays) ~/ 7) + 1;
+    return '${lundi.year}-S${rang.toString().padLeft(2, '0')}';
+  }
+
+  /// Sondage de la semaine en cours ; à défaut, le plus récent publié.
+  ///
+  /// Le repli évite une carte vide quand personne n'a publié de sondage cette
+  /// semaine-là — mieux vaut une question un peu ancienne que rien.
+  Stream<Sondage?> getSondageEnCours() {
+    return _db.collection('sondages').snapshots().map((snapshot) {
+      final sondages = snapshot.docs
+          .map((doc) => Sondage.fromFirestore(doc.data(), doc.id))
+          .where((s) => s.options.length >= 2)
+          .toList();
+      if (sondages.isEmpty) return null;
+
+      final semaine = semaineKey();
+      for (final sondage in sondages) {
+        if (sondage.semaine == semaine) return sondage;
+      }
+
+      sondages.sort((a, b) => b.semaine.compareTo(a.semaine));
+      return sondages.first;
+    });
+  }
+
+  /// Option choisie par le membre, ou null s'il n'a pas encore voté.
+  Stream<int?> getMonVote(String uid, String sondageId) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('votes')
+        .doc(sondageId)
+        .snapshots()
+        .map((doc) => doc.exists ? (doc.data()?['option'] as num?)?.toInt() : null);
+  }
+
+  /// Enregistre un vote. Renvoie false si le membre avait déjà voté : le
+  /// résultat s'affiche alors sans que sa voix soit comptée deux fois.
+  Future<bool> voterSondage(String uid, Sondage sondage, int option) {
+    if (option < 0 || option >= sondage.options.length) return Future.value(false);
+
+    final sondageRef = _db.collection('sondages').doc(sondage.id);
+    final voteRef = _db.collection('users').doc(uid).collection('votes').doc(sondage.id);
+
+    return _db.runTransaction<bool>((transaction) async {
+      final doc = await transaction.get(sondageRef);
+      if (!doc.exists) return false;
+      if ((await transaction.get(voteRef)).exists) return false;
+
+      final options = (doc.data()?['options'] as List? ?? const []).length;
+      final voix = List<int>.generate(options, (i) {
+        final brutes = doc.data()?['voix'] as List? ?? const [];
+        return i < brutes.length ? (int.tryParse(brutes[i].toString()) ?? 0) : 0;
+      });
+      if (option >= voix.length) return false;
+
+      voix[option] = voix[option] + 1;
+
+      transaction.update(sondageRef, {'voix': voix});
+      transaction.set(voteRef, {
+        'option': option,
+        'votedAt': FieldValue.serverTimestamp(),
+      });
+      return true;
+    });
+  }
+
+  Future<void> checkAndInitializeSondages() async {
+    try {
+      final existants = await _db.collection('sondages').limit(1).get();
+      if (existants.docs.isNotEmpty) return;
+
+      final semaine = semaineKey();
+      for (var i = 0; i < _sondagesLivres.length; i++) {
+        final sondage = _sondagesLivres[i];
+        await _db.collection('sondages').add({
+          ...sondage,
+          // Le premier sondage est celui de la semaine en cours, les suivants
+          // sont datés des semaines passées : ils prennent le relais si
+          // personne ne publie la semaine suivante.
+          'semaine': i == 0
+              ? semaine
+              : semaineKey(DateTime.now().subtract(Duration(days: 7 * i))),
+          'voix': List<int>.filled((sondage['options'] as List).length, 0),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
+    } catch (e) {
+      debugPrint("Amorçage des sondages impossible : $e");
+    }
+  }
+
+  static const List<Map<String, dynamic>> _sondagesLivres = [
+    {
+      'question': "Qu'est-ce qui t'aide le plus à tenir dans la prière ?",
+      'contexte': "Ta réponse aide la communauté à savoir sur quoi insister.",
+      'options': ["Un horaire fixe", "Prier à plusieurs", "Un rappel sur le téléphone", "Un objectif court"],
+    },
+    {
+      'question': "Quel moment de la journée pries-tu le plus facilement ?",
+      'contexte': "Il n'y a pas de bonne réponse : chacun a son rythme.",
+      'options': ["Le matin tôt", "Sur le trajet", "Le midi", "Le soir avant de dormir"],
+    },
+    {
+      'question': "Qu'aimerais-tu approfondir cette année ?",
+      'contexte': "Les parcours à venir seront choisis à partir de vos réponses.",
+      'options': ["La Parole de Dieu", "La prière du cœur", "Le discernement", "Le service des pauvres"],
+    },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // Évaluation en cours de parcours
+  // ---------------------------------------------------------------------------
+
+  /// Enregistre l'appropriation d'une étape : où le membre se situe (1 à 5) et
+  /// ce qu'il retient.
+  ///
+  /// Les évaluations vivent dans le document de progression du parcours, sous
+  /// forme de carte indexée par le numéro du jour : une seule lecture suffit à
+  /// afficher toute la frise, et rien ne se perd si une étape est refaite.
+  Future<void> enregistrerEvaluationEtape(
+    String uid,
+    String parcoursId,
+    int jour, {
+    required int niveau,
+    String retenu = '',
+  }) async {
+    await _db
+        .collection('users')
+        .doc(uid)
+        .collection('parcours_progress')
+        .doc(parcoursId)
+        .set({
+      'evaluations': {
+        '$jour': {
+          'niveau': niveau.clamp(1, 5),
+          'retenu': retenu.trim(),
+          'evalueLe': Timestamp.now(),
+        },
+      },
+    }, SetOptions(merge: true));
+  }
+
+  /// Évaluations déjà saisies, par numéro de jour.
+  Stream<Map<int, int>> getEvaluationsParcours(String uid, String parcoursId) {
+    return _db
+        .collection('users')
+        .doc(uid)
+        .collection('parcours_progress')
+        .doc(parcoursId)
+        .snapshots()
+        .map((doc) {
+      final brut = doc.data()?['evaluations'] as Map<String, dynamic>? ?? const {};
+      final resultat = <int, int>{};
+      brut.forEach((jour, valeur) {
+        final numero = int.tryParse(jour);
+        final niveau = (valeur is Map ? valeur['niveau'] : null) as num?;
+        if (numero != null && niveau != null) resultat[numero] = niveau.toInt();
+      });
+      return resultat;
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Avis de fin de parcours
+  // ---------------------------------------------------------------------------
+
+  /// Avis déposés sur un parcours, du plus récent au plus ancien.
+  ///
+  /// Un seul filtre d'égalité : aucun index composite n'est nécessaire, et le
+  /// tri se fait côté client.
+  Stream<List<AvisParcours>> getAvisParcours(String parcoursId) {
+    return _db
+        .collection('parcours_avis')
+        .where('parcoursId', isEqualTo: parcoursId)
+        .snapshots()
+        .map((snapshot) {
+      final avis = snapshot.docs
+          .map((doc) => AvisParcours.fromFirestore(doc.data(), doc.id))
+          .toList();
+      avis.sort((a, b) {
+        final dateA = a.createdAt;
+        final dateB = b.createdAt;
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return -1;
+        if (dateB == null) return 1;
+        return dateB.compareTo(dateA);
+      });
+      return avis;
+    });
+  }
+
+  /// Avis du membre sur ce parcours, ou null. Lecture directe par identifiant :
+  /// pas de requête, donc pas de règle de liste à satisfaire.
+  Stream<AvisParcours?> getMonAvisParcours(String uid, String parcoursId) {
+    return _db
+        .collection('parcours_avis')
+        .doc(AvisParcours.documentId(parcoursId, uid))
+        .snapshots()
+        .map((doc) {
+      final data = doc.data();
+      if (!doc.exists || data == null) return null;
+      return AvisParcours.fromFirestore(data, doc.id);
+    });
+  }
+
+  /// Dépose ou met à jour l'avis du membre. L'identifiant du document contient
+  /// son uid : il ne peut en avoir qu'un par parcours, et le modifier plutôt
+  /// que d'en empiler plusieurs.
+  Future<void> enregistrerAvisParcours(
+    String uid,
+    String parcoursId, {
+    required int note,
+    required String pointFort,
+    required String commentaire,
+    required bool recommande,
+  }) async {
+    String authorName = FirebaseAuth.instance.currentUser?.displayName ?? '';
+    final profil = (await _db.collection('users').doc(uid).get()).data();
+    if ((profil?['fullName'] ?? '').toString().isNotEmpty) {
+      authorName = profil!['fullName'].toString();
+    }
+    if (authorName.trim().isEmpty) authorName = 'Un membre';
+
+    await _db
+        .collection('parcours_avis')
+        .doc(AvisParcours.documentId(parcoursId, uid))
+        .set({
+      'parcoursId': parcoursId,
+      'authorUid': uid,
+      'authorName': authorName,
+      'note': note.clamp(1, 5),
+      'pointFort': pointFort,
+      'commentaire': commentaire.trim(),
+      'recommande': recommande,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Aller plus loin : besoins et ressources
+  // ---------------------------------------------------------------------------
+
+  Stream<List<BesoinAide>> getBesoinsAide() {
+    return _db.collection('aide_besoins').snapshots().map((snapshot) {
+      final besoins = snapshot.docs
+          .map((doc) => BesoinAide.fromFirestore(doc.data(), doc.id))
+          .where((b) => b.titre.isNotEmpty)
+          .toList();
+      besoins.sort((a, b) => a.ordre.compareTo(b.ordre));
+      return besoins;
+    });
+  }
+
+  /// Message affiché en cas d'urgence, dans `app_content/urgences`.
+  ///
+  /// Tant que l'équipe n'a pas saisi de numéros locaux, on renvoie une consigne
+  /// vraie partout plutôt qu'un numéro inventé, qui serait dangereux.
+  Stream<String> getConsigneUrgence() {
+    return _db.collection('app_content').doc('urgences').snapshots().map((doc) {
+      final texte = (doc.data()?['message'] ?? '').toString().trim();
+      if (texte.isNotEmpty) return texte;
+      return "En cas de danger immédiat, contacte les services d'urgence de ton pays "
+          "ou rends-toi à l'hôpital le plus proche. Cette application n'est pas un service d'urgence.";
+    });
+  }
+
+  /// Amorce les besoins, et complète ceux qui manquent.
+  ///
+  /// On ne réécrit jamais un besoin existant : l'équipe y ajoute des contacts
+  /// locaux depuis la console, et un amorçage ne doit pas les effacer.
+  Future<void> checkAndInitializeBesoinsAide() async {
+    try {
+      for (final besoin in catalogueBesoins) {
+        final ref = _db.collection('aide_besoins').doc(besoin['id'] as String);
+        if ((await ref.get()).exists) continue;
+
+        final donnees = Map<String, dynamic>.from(besoin)..remove('id');
+        await ref.set(donnees);
+      }
+    } catch (e) {
+      debugPrint("Amorçage des besoins d'aide impossible : $e");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Demandes d'écoute et d'accompagnement
+  // ---------------------------------------------------------------------------
+
+  /// Demandes déposées par le membre, de la plus récente à la plus ancienne.
+  ///
+  /// Le filtre sur `uid` n'est pas qu'un confort : les règles Firestore
+  /// n'autorisent la lecture que des demandes dont on est l'auteur, et une
+  /// requête sans ce filtre serait refusée en bloc.
+  Stream<List<DemandeEcoute>> getMesDemandesEcoute(String uid) {
+    return _db
+        .collection('demandes_ecoute')
+        .where('uid', isEqualTo: uid)
+        .snapshots()
+        .map((snapshot) {
+      final demandes = snapshot.docs
+          .map((doc) => DemandeEcoute.fromFirestore(doc.data(), doc.id))
+          .toList();
+      demandes.sort((a, b) {
+        final dateA = a.createdAt;
+        final dateB = b.createdAt;
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return -1;
+        if (dateB == null) return 1;
+        return dateB.compareTo(dateA);
+      });
+      return demandes;
+    });
+  }
+
+  Future<void> envoyerDemandeEcoute(
+    String uid, {
+    required String type,
+    required String sujet,
+    required String message,
+    required String moyenContact,
+    String coordonnee = '',
+  }) async {
+    await _db.collection('demandes_ecoute').add({
+      'uid': uid,
+      'type': type,
+      'sujet': sujet.trim(),
+      'message': message.trim(),
+      'moyenContact': moyenContact,
+      'coordonnee': coordonnee.trim(),
+      'statut': StatutDemande.envoyee,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Retire une demande. Seul son auteur le peut, côté règles comme ici.
+  Future<void> annulerDemandeEcoute(String demandeId) async {
+    await _db.collection('demandes_ecoute').doc(demandeId).delete();
   }
 }

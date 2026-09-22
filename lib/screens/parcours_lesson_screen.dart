@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
+import 'parcours_evaluation_sheet.dart';
 
 class ParcoursLessonScreen extends StatefulWidget {
   final String parcoursId;
@@ -52,10 +53,24 @@ class _ParcoursLessonScreenState extends State<ParcoursLessonScreen> {
         await _firestoreService.updateParcoursProgress(_uid!, widget.parcoursId, newCompletedDays);
       }
 
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Leçon validée !")));
-      }
+      if (!mounted) return;
+
+      // L'évaluation est proposée avant de refermer la leçon : elle porte sur
+      // ce que le membre vient de lire, et l'afficher après la fermeture la
+      // détacherait de son contexte.
+      await showEvaluationEtape(
+        context,
+        parcoursId: widget.parcoursId,
+        parcoursTitle: widget.parcoursTitle,
+        lessonTitle: widget.lessonTitle,
+        jour: widget.dayNumber,
+        couleur: widget.primaryColor,
+      );
+
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context, true);
+      messenger.showSnackBar(const SnackBar(content: Text("Leçon validée !")));
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Erreur: $e")));

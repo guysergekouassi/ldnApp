@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/intention_model.dart';
 import '../services/firestore_service.dart';
@@ -13,8 +14,33 @@ class IntentionsSemaineScreen extends StatefulWidget {
 
 class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  final String? _uid = FirebaseAuth.instance.currentUser?.uid;
   Set<String> _prayedIntentions = {};
   StreamSubscription<List<String>>? _subscription;
+
+  Future<void> _basculerEpingle(Intention intention) async {
+    if (_uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Connecte-toi pour épingler une intention."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final epingle = await _firestoreService.togglePinIntention(_uid!, intention.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(epingle
+            ? "Intention épinglée : elle reste en tête de ta liste 📌"
+            : "Intention désépinglée."),
+        backgroundColor: epingle ? const Color(0xFFC72127) : Colors.grey,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -178,7 +204,9 @@ class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
           ),
         ),
         Container(
-          height: 280,
+          // Hauteur minimale et non figée : avec un texte agrandi par les
+          // réglages système, le contenu débordait de l'en-tête.
+          constraints: const BoxConstraints(minHeight: 280),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -266,7 +294,14 @@ class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
       children: [
         const Text("CETTE SEMAINE", style: TextStyle(fontSize: 10, color: Color(0xFFC72127), fontWeight: FontWeight.bold)),
         const SizedBox(height: 15),
-        StreamBuilder<List<Intention>>(
+        StreamBuilder<Set<String>>(
+          stream: _uid != null
+              ? _firestoreService.getPinnedIntentionIds(_uid!)
+              : Stream.value(<String>{}),
+          builder: (context, epingleesSnapshot) {
+            final epinglees = epingleesSnapshot.data ?? <String>{};
+
+            return StreamBuilder<List<Intention>>(
           stream: _firestoreService.getIntentions(),
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -278,9 +313,10 @@ class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
             if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return const Center(child: Text("Aucune intention pour le moment.", style: TextStyle(color: Colors.grey)));
             }
-            
-            final intentions = snapshot.data!;
-            
+
+            // Les intentions épinglées ouvrent la liste de la semaine.
+            final intentions = FirestoreService.trierAvecEpinglees(snapshot.data!, epinglees);
+
             return ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
@@ -288,22 +324,26 @@ class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
               itemBuilder: (context, index) {
                 final intention = intentions[index];
                 final isPraying = _prayedIntentions.contains(intention.id);
-                return _buildIntentionCard(intention, isPraying);
+                return _buildIntentionCard(intention, isPraying, epinglees.contains(intention.id));
               },
             );
+          },
+        );
           },
         ),
       ],
     );
   }
 
-  Widget _buildIntentionCard(Intention intention, bool isPraying) {
+  Widget _buildIntentionCard(Intention intention, bool isPraying, bool estEpinglee) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
+        // Liseré rouge : repère visuel des intentions épinglées.
+        border: estEpinglee ? Border.all(color: const Color(0xFFC72127), width: 1.5) : null,
         boxShadow: [
           BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
         ],
@@ -333,6 +373,22 @@ class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 4),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  splashRadius: 20,
+                  tooltip: estEpinglee ? "Désépingler" : "Épingler cette intention",
+                  icon: Icon(
+                    estEpinglee ? Icons.push_pin : Icons.push_pin_outlined,
+                    size: 20,
+                    color: estEpinglee ? const Color(0xFFC72127) : Colors.grey.shade400,
+                  ),
+                  onPressed: () => _basculerEpingle(intention),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 20),
@@ -343,7 +399,7 @@ class _IntentionsSemaineScreenState extends State<IntentionsSemaineScreen> {
                 children: [
                   const Icon(Icons.people_outline, color: Colors.grey, size: 14),
                   const SizedBox(width: 4),
-                  Text("${intention.count} prient déjà", style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                  Text("${intention.count} prient déjà", style: const TextStyle(fontSize: 10, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
               ElevatedButton(

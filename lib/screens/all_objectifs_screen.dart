@@ -110,8 +110,7 @@ class AllObjectifsScreen extends StatelessWidget {
                               ),
                               Text(
                                 "${(progress * 100).toInt()} %",
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color),
-                              ),
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color), maxLines: 1, overflow: TextOverflow.ellipsis),
                             ],
                           ),
                           const SizedBox(height: 15),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../services/auth_service.dart';
+import '../components/ldn_signature.dart';
 import 'login_screen.dart';
 import 'signup_screen.dart';
 import 'home_screen.dart';
@@ -31,6 +32,35 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Échec de la connexion avec Google.")),
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Ouvre l'application sans créer de compte.
+  ///
+  /// La session repose sur un compte anonyme Firebase : la progression est
+  /// bien enregistrée, et Mon Espace propose ensuite de la rattacher à un
+  /// compte définitif.
+  Future<void> _handleGuestLogin() async {
+    setState(() => _isLoading = true);
+    try {
+      final user = await _authService.signInAnonymously();
+      if (!mounted) return;
+      if (user != null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Impossible d'ouvrir une session invité. Réessaie ou crée un compte."),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -202,8 +232,23 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           },
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      
+                      const SizedBox(height: 12),
+
+                      // Entrée sans compte : l'application s'ouvre tout de
+                      // suite, la création de compte reste proposée plus tard.
+                      TextButton(
+                        onPressed: _isLoading ? null : _handleGuestLogin,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 44),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        child: const Text(
+                          "Continuer sans compte",
+                          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w600, fontSize: 14),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
                       // Créer un compte
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -217,12 +262,14 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                               );
                             },
                             child: const Text(
-                              "Créer un compte >", 
+                              "Créer un compte >",
                               style: TextStyle(color: Color(0xFFD97757), fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                           ),
                         ],
                       ),
+                      const SizedBox(height: 8),
+                      const LdnSignature(compact: true),
                     ],
                   ),
                 ),

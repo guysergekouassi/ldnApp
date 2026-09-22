@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
 import '../models/parcours_content_model.dart';
 import 'parcours_lesson_screen.dart';
+import 'parcours_evaluation_sheet.dart';
+import '../models/parcours_avis_model.dart';
 
 /// Écran de détail d'un parcours, entièrement piloté par le document
 /// `parcours_content/<parcoursId>` : titre, sous-titre, couleur, visuel et
@@ -71,6 +73,8 @@ class _ParcoursDetailScreenState extends State<ParcoursDetailScreen> {
                           _buildTimeline(completedDays, parcoursContent, primaryColor),
                           const SizedBox(height: 25),
                           _buildContinueBanner(completedDays, parcoursContent, primaryColor),
+                          const SizedBox(height: 25),
+                          _buildAvis(parcoursContent, totalDays, completedDays, primaryColor),
                           const SizedBox(height: 30),
                         ],
                       ),
@@ -189,7 +193,7 @@ class _ParcoursDetailScreenState extends State<ParcoursDetailScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text("Ta progression", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A), fontSize: 16)),
-              Text("${(progress * 100).toInt()}%", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("${(progress * 100).toInt()}%", style: TextStyle(color: primaryColor, fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
             ],
           ),
           const SizedBox(height: 15),
@@ -340,6 +344,186 @@ class _ParcoursDetailScreenState extends State<ParcoursDetailScreen> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Avis des membres sur le parcours.
+  ///
+  /// Le formulaire n'est proposé qu'une fois le parcours terminé : un avis
+  /// donné au troisième jour ne dirait pas grand-chose de l'ensemble.
+  Widget _buildAvis(
+    ParcoursContent? content,
+    int totalDays,
+    int completedDays,
+    Color primaryColor,
+  ) {
+    if (content == null) return const SizedBox.shrink();
+    final termine = totalDays > 0 && completedDays >= totalDays;
+
+    return StreamBuilder<List<AvisParcours>>(
+      stream: _firestoreService.getAvisParcours(_parcoursId),
+      builder: (context, snapshot) {
+        final avis = snapshot.data ?? <AvisParcours>[];
+        final resume = ResumeAvis.depuis(avis);
+
+        return StreamBuilder<AvisParcours?>(
+          stream: _uid != null
+              ? _firestoreService.getMonAvisParcours(_uid!, _parcoursId)
+              : Stream.value(null),
+          builder: (context, monAvisSnapshot) {
+            final monAvis = monAvisSnapshot.data;
+
+            // Rien à montrer tant que personne n'a donné son avis et que le
+            // membre n'a pas fini : la section resterait un cadre vide.
+            if (resume.nombre == 0 && !termine) return const SizedBox.shrink();
+
+            return Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 5)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Ce qu'en disent les membres",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 12),
+                  if (resume.nombre > 0)
+                    _buildResumeAvis(resume, primaryColor)
+                  else
+                    const Text(
+                      "Aucun avis pour l'instant. Tu peux être le premier.",
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                  ...avis.take(3).map(_buildAvisItem),
+                  if (termine) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: primaryColor),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: () => showAvisParcours(
+                          context,
+                          parcoursId: _parcoursId,
+                          parcoursTitle: content.title,
+                          couleur: primaryColor,
+                          avisExistant: monAvis,
+                        ),
+                        icon: Icon(Icons.rate_review_outlined, color: primaryColor, size: 18),
+                        label: Text(
+                          monAvis == null ? "Donner mon avis" : "Modifier mon avis",
+                          style: TextStyle(color: primaryColor, fontSize: 13, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildResumeAvis(ResumeAvis resume, Color primaryColor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Text(
+            resume.moyenne.toStringAsFixed(1),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 26, color: primaryColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: List.generate(
+                    5,
+                    (i) => Icon(
+                      i < resume.moyenne.round() ? Icons.star : Icons.star_border,
+                      size: 16,
+                      color: const Color(0xFFD4A017),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  "${resume.nombre} avis · ${(resume.tauxRecommandation * 100).round()} % le recommandent",
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAvisItem(AvisParcours avis) {
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  avis.authorName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A)),
+                ),
+              ),
+              Row(
+                children: List.generate(
+                  5,
+                  (i) => Icon(
+                    i < avis.note ? Icons.star : Icons.star_border,
+                    size: 12,
+                    color: const Color(0xFFD4A017),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (avis.pointFort.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              PointsFortsParcours.libelle(avis.pointFort),
+              style: const TextStyle(color: Color(0xFF5B4FC8), fontSize: 10, fontWeight: FontWeight.bold),
+            ),
+          ],
+          if (avis.commentaire.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              avis.commentaire,
+              style: const TextStyle(color: Colors.black87, fontSize: 12, height: 1.5),
+            ),
+          ],
         ],
       ),
     );

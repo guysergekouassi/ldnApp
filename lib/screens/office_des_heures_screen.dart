@@ -125,7 +125,9 @@ class _OfficeDesHeuresScreenState extends State<OfficeDesHeuresScreen> {
           ),
         ),
         Container(
-          height: 300,
+          // Hauteur minimale et non figée : avec un texte agrandi par les
+          // réglages système, le contenu débordait de l'en-tête.
+          constraints: const BoxConstraints(minHeight: 300),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(

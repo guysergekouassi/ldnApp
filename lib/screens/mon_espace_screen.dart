@@ -14,6 +14,11 @@ import 'create_intention_screen.dart';
 import 'all_intentions_screen.dart';
 import 'all_objectifs_screen.dart';
 import 'welcome_screen.dart';
+import '../components/ldn_signature.dart';
+import '../services/auth_service.dart';
+import '../models/discipline_model.dart';
+import 'membre_screen.dart';
+import 'aller_plus_loin_screen.dart';
 
 class MonEspaceScreen extends StatefulWidget {
   const MonEspaceScreen({Key? key}) : super(key: key);
@@ -24,7 +29,11 @@ class MonEspaceScreen extends StatefulWidget {
 
 class _MonEspaceScreenState extends State<MonEspaceScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  final AuthService _authService = AuthService();
   final String? _uid = FirebaseAuth.instance.currentUser?.uid;
+
+  /// Session ouverte sans compte : Mon Espace propose alors la conversion.
+  bool get _estInvite => FirebaseAuth.instance.currentUser?.isAnonymous ?? false;
 
   /// Ancre du bloc « Paramètres », ciblée par l'icône d'engrenage de l'en-tête.
   final GlobalKey _parametresKey = GlobalKey();
@@ -59,6 +68,12 @@ class _MonEspaceScreenState extends State<MonEspaceScreen> {
               child: Column(
                 children: [
                   const SizedBox(height: 10),
+                  if (_estInvite) ...[
+                    _buildBandeauInvite(),
+                    const SizedBox(height: 10),
+                  ],
+                  _buildAccesMembre(),
+                  const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -71,11 +86,13 @@ class _MonEspaceScreenState extends State<MonEspaceScreen> {
                   _buildProgrammePriere(),
                   const SizedBox(height: 10),
                   _buildIntentions(),
+                  const SizedBox(height: 10),
+                  _buildAllerPlusLoin(),
                   const SizedBox(height: 15),
                   _buildParametres(),
                   const SizedBox(height: 15),
                   _buildParoleAujourdHui(),
-                  const SizedBox(height: 30),
+                  const LdnSignature(),
                 ],
               ),
             ),
@@ -321,7 +338,7 @@ class _MonEspaceScreenState extends State<MonEspaceScreen> {
                     ),
                   ),
                   const SizedBox(width: 6),
-                  Text("${(progress * 100).toInt()}%", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9)),
+                  Text("${(progress * 100).toInt()}%", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ],
@@ -822,6 +839,417 @@ class _MonEspaceScreenState extends State<MonEspaceScreen> {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Entrée vers l'espace Membre.
+  ///
+  /// Le palier affiché est recalculé à la volée depuis la règle de vie et la
+  /// régularité : il n'est jamais stocké, donc jamais en retard sur les faits.
+  Widget _buildAccesMembre() {
+    if (_uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<DisciplineMembre>(
+      stream: _firestoreService.getDiscipline(_uid!),
+      builder: (context, disciplineSnapshot) {
+        final discipline =
+            disciplineSnapshot.data ?? const DisciplineMembre(engagementIds: []);
+
+        return StreamBuilder<Regularite>(
+          stream: _firestoreService.getRegularite(_uid!),
+          builder: (context, regulariteSnapshot) {
+            final statut = StatutMembreLibelle.calculer(
+              estInvite: _estInvite,
+              nombreEngagements: discipline.engagementIds.length,
+              streak: regulariteSnapshot.data?.streak ?? 0,
+            );
+            final couleur = Color(
+              int.parse(statut.couleurHex.replaceFirst('#', '0xFF')),
+            );
+
+            return InkWell(
+              borderRadius: BorderRadius.circular(15),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MembreScreen()),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [couleur, Color.lerp(couleur, Colors.black, 0.3) ?? couleur],
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.badge_outlined, color: Colors.white, size: 18),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Espace Membre",
+                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            discipline.estDefinie
+                                ? "${statut.libelle} · ${discipline.engagementIds.length} engagements"
+                                : "${statut.libelle} · choisis ta règle de vie",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.white, size: 20),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Bandeau affiché aux comptes invités.
+  ///
+  /// Le mode invité enregistre bien la progression, mais elle est liée à
+  /// l'installation : sans compte, une réinstallation la perd. Le bandeau le
+  /// dit et propose la conversion, qui conserve tout.
+  Widget _buildBandeauInvite() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E7),
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.person_outline, color: Colors.orange, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Tu es en mode invité",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Crée ton compte pour garder ta progression même en changeant de téléphone.",
+                  style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.4),
+                ),
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    minimumSize: const Size(0, 32),
+                  ),
+                  onPressed: _showCreationCompte,
+                  child: const Text(
+                    "Créer mon compte",
+                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Formulaire de conversion du compte invité en compte définitif.
+  ///
+  /// On passe par `lierCompteEmail` / `lierCompteGoogle` plutôt que par une
+  /// inscription classique : l'identifiant Firebase est conservé, donc toute
+  /// la progression déjà enregistrée reste rattachée au membre.
+  Future<void> _showCreationCompte() async {
+    final nomController = TextEditingController();
+    final emailController = TextEditingController();
+    final motDePasseController = TextEditingController();
+    bool enCours = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          Future<void> terminer(Future<User?> Function() action) async {
+            setSheetState(() => enCours = true);
+            try {
+              final user = await action();
+              if (user == null) {
+                setSheetState(() => enCours = false);
+                return; // connexion Google annulée
+              }
+              if (!sheetContext.mounted) return;
+              Navigator.pop(sheetContext);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Compte créé : ta progression est sauvegardée 🎉"),
+                  backgroundColor: Colors.green,
+                ),
+              );
+              setState(() {}); // le bandeau disparaît
+            } on FirebaseAuthException catch (e) {
+              setSheetState(() => enCours = false);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(_messageErreurAuth(e)), backgroundColor: Colors.red),
+              );
+            } catch (e) {
+              setSheetState(() => enCours = false);
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Création impossible. Vérifie ta connexion."),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(sheetContext).viewInsets.bottom),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      "Créer mon compte",
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      "Tout ce que tu as déjà enregistré est conservé.",
+                      style: TextStyle(color: Colors.grey, fontSize: 12),
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: nomController,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: InputDecoration(
+                        labelText: "Mon nom",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.orange),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      decoration: InputDecoration(
+                        labelText: "Email",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.orange),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: motDePasseController,
+                      obscureText: true,
+                      decoration: InputDecoration(
+                        labelText: "Mot de passe",
+                        helperText: "6 caractères minimum",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Colors.orange),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: enCours
+                            ? null
+                            : () {
+                                final nom = nomController.text.trim();
+                                final email = emailController.text.trim();
+                                final motDePasse = motDePasseController.text;
+
+                                if (nom.isEmpty || email.isEmpty || motDePasse.length < 6) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text("Renseigne ton nom, ton email et un mot de passe de 6 caractères."),
+                                      backgroundColor: Colors.orange,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                terminer(() => _authService.lierCompteEmail(nom, email, motDePasse));
+                              },
+                        child: enCours
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text(
+                                "Créer mon compte",
+                                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(child: Divider(color: Colors.grey.shade300)),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text("OU", style: TextStyle(color: Colors.grey, fontSize: 11, fontWeight: FontWeight.bold)),
+                        ),
+                        Expanded(child: Divider(color: Colors.grey.shade300)),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey.shade300),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        onPressed: enCours ? null : () => terminer(_authService.lierCompteGoogle),
+                        icon: const Icon(Icons.account_circle_outlined, color: Colors.black87, size: 20),
+                        label: const Text(
+                          "Continuer avec Google",
+                          style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  String _messageErreurAuth(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'email-already-in-use':
+      case 'credential-already-in-use':
+        return "Cet email est déjà utilisé. Connecte-toi avec ce compte.";
+      case 'invalid-email':
+        return "Cet email n'est pas valide.";
+      case 'weak-password':
+        return "Mot de passe trop faible : 6 caractères minimum.";
+      case 'operation-not-allowed':
+        return "Ce mode de connexion n'est pas activé côté Firebase.";
+      default:
+        return "Création impossible. Réessaie dans un instant.";
+    }
+  }
+
+  /// Entrée vers « Aller plus loin ».
+  ///
+  /// Placée dans Mon Espace et non dans la Communauté : on cherche de l'aide
+  /// depuis son espace personnel, pas depuis un fil public.
+  Widget _buildAllerPlusLoin() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(15),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const AllerPlusLoinScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.support_outlined, color: Colors.orange, size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Aller plus loin",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    "Deuil, solitude, doute, dépendance… Trouve vers qui te tourner, ou demande une écoute.",
+                    style: TextStyle(color: Colors.grey, fontSize: 11, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+          ],
         ),
       ),
     );

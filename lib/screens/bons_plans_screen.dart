@@ -699,7 +699,7 @@ class _BonsPlansScreenState extends State<BonsPlansScreen> {
                     decoration: BoxDecoration(color: Colors.orange.shade100, borderRadius: BorderRadius.circular(20)),
                     child: Row(
                       children: [
-                        Text(deal.actionText, style: const TextStyle(color: Colors.orange, fontSize: 8, fontWeight: FontWeight.bold)),
+                        Text(deal.actionText, style: const TextStyle(color: Colors.orange, fontSize: 8, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(width: 4),
                         const Icon(Icons.chevron_right, color: Colors.orange, size: 12),
                       ],

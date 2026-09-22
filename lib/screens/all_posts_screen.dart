@@ -5,6 +5,7 @@ import '../models/post_model.dart';
 import '../components/user_avatar.dart';
 import '../services/share_service.dart';
 import 'create_post_screen.dart';
+import 'temoignages_screen.dart';
 
 class AllPostsScreen extends StatefulWidget {
   const AllPostsScreen({Key? key}) : super(key: key);
@@ -36,7 +37,12 @@ class _AllPostsScreenState extends State<AllPostsScreen> {
         backgroundColor: Colors.orange,
         child: const Icon(Icons.edit, color: Colors.white),
       ),
-      body: StreamBuilder<List<Post>>(
+      body: StreamBuilder<Set<String>>(
+        stream: _firestoreService.getLikedPostIds(),
+        builder: (context, aimesSnapshot) {
+          final aimes = aimesSnapshot.data ?? <String>{};
+
+          return StreamBuilder<List<Post>>(
         stream: _firestoreService.getPosts(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -102,7 +108,7 @@ class _AllPostsScreenState extends State<AllPostsScreen> {
                               const SizedBox(height: 2),
                               Row(
                                 children: [
-                                  Text(dateFormat.format(post.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                  Text(dateFormat.format(post.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
                                   const SizedBox(width: 4),
                                   const Icon(Icons.public, color: Colors.grey, size: 10),
                                 ],
@@ -134,30 +140,34 @@ class _AllPostsScreenState extends State<AllPostsScreen> {
                     const SizedBox(height: 10),
                     Row(
                       children: [
-                        InkWell(
-                          onTap: () {
-                            _firestoreService.toggleLikePost(post.id);
-                          },
-                          child: Row(
-                            children: [
-                              const Icon(Icons.favorite, color: Colors.red, size: 18),
-                              const SizedBox(width: 5),
-                              Text("${post.likes}", style: const TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
+                        LikeButton(
+                          estAime: aimes.contains(post.id),
+                          compteur: post.likes,
+                          onTap: () => _firestoreService.toggleLikePost(post.id),
+                          taille: 18,
                         ),
                         const Spacer(),
                         InkWell(
+                          borderRadius: BorderRadius.circular(20),
                           onTap: () => ShareService.sharePost(
                             authorName: post.authorName,
                             content: post.content,
                           ),
-                          child: Row(
-                            children: const [
-                              Icon(Icons.reply, color: Colors.grey, size: 18),
-                              SizedBox(width: 5),
-                              Text("Partager", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                            ],
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: const Color(0xFFE5E7EB)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.reply, color: Colors.grey, size: 18),
+                                SizedBox(width: 5),
+                                Text("Partager", style: TextStyle(color: Colors.grey, fontSize: 13, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
                           ),
                         ),
                         const Spacer(),
@@ -169,6 +179,8 @@ class _AllPostsScreenState extends State<AllPostsScreen> {
             },
           );
         }
+      );
+        },
       ),
     );
   }

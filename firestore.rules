@@ -1,0 +1,191 @@
+rules_version = '2';
+
+// Règles de sécurité Firestore — JEP / Lumière Des Nations.
+//
+// Trois familles de données, trois régimes :
+//
+//   1. Les données personnelles (`users/{uid}/…`) n'appartiennent qu'à leur
+//      propriétaire : personne d'autre ne les lit ni ne les écrit.
+//   2. Le contenu de l'application (catalogues de prières, parcours, quiz…)
+//      est lisible par tout membre connecté, et reste inscriptible par le
+//      client parce que c'est l'application elle-même qui l'amorce au premier
+//      lancement (`checkAndInitialize*`) et qui applique ses migrations.
+//   3. Les contenus déposés par les membres (publications, intentions,
+//      témoignages) sont lisibles par tous les membres ; la suppression est
+//      réservée à l'auteur quand le document en garde la trace.
+//
+// Tout ce qui n'est pas explicitement listé ici est refusé par la règle
+// finale : une nouvelle collection doit être déclarée pour fonctionner.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------------
+    // Fonctions communes
+    // ---------------------------------------------------------------------
+
+    function estConnecte() {
+      return request.auth != null;
+    }
+
+    function estProprietaire(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Vrai quand le document déposé se réclame bien de son auteur : empêche
+    // de publier au nom de quelqu'un d'autre.
+    function auteurEstLAppelant() {
+      return request.auth != null && request.resource.data.authorUid == request.auth.uid;
+    }
+
+    function auteurDuDocument() {
+      return request.auth != null && resource.data.authorUid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------------
+    // 1. Données personnelles
+    // ---------------------------------------------------------------------
+
+    match /users/{uid} {
+      // Le profil contient l'email : il ne sort pas de son propriétaire. Les
+      // publications recopient déjà le nom et l'avatar de l'auteur, la
+      // communauté n'a donc pas besoin de lire les profils des autres.
+      allow read: if estProprietaire(uid);
+      allow create, update: if estProprietaire(uid);
+      allow delete: if false;
+
+      // Progression, favoris, intentions personnelles, carnet, défis, plans de
+      // lecture, « j'aime »… : toutes les sous-collections suivent le profil.
+      //
+      // Le premier segment est nommé isolément, et non `{chemin=**}` seul :
+      // un joker récursif correspond aussi à **zéro** segment, il couvrirait
+      // donc le document de profil lui-même et son `write` annulerait le
+      // `allow delete: if false` ci-dessus.
+      match /{sousCollection}/{document=**} {
+        allow read, write: if estProprietaire(uid);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // 2. Contenu de l'application
+    // ---------------------------------------------------------------------
+    //
+    // L'écriture reste ouverte aux membres connectés : l'amorçage et les
+    // migrations tournent côté client. À déplacer vers une Cloud Function le
+    // jour où l'on voudra verrouiller ces collections en lecture seule.
+
+    match /app_content/{document=**}                 { allow read, write: if estConnecte(); }
+    match /daily_content/{document=**}               { allow read, write: if estConnecte(); }
+    match /daily_verses/{document=**}                { allow read, write: if estConnecte(); }
+    match /daily_tasks/{document=**}                 { allow read, write: if estConnecte(); }
+    match /prayer_activities/{document=**}           { allow read, write: if estConnecte(); }
+    match /rosary_mysteries/{document=**}            { allow read, write: if estConnecte(); }
+    match /offices/{document=**}                     { allow read, write: if estConnecte(); }
+    match /neuvaines/{document=**}                   { allow read, write: if estConnecte(); }
+    match /parcours_content/{document=**}            { allow read, write: if estConnecte(); }
+    match /metanoia_levels/{document=**}             { allow read, write: if estConnecte(); }
+    match /metanoia_lessons/{document=**}            { allow read, write: if estConnecte(); }
+    match /examen_conscience/{document=**}           { allow read, write: if estConnecte(); }
+    match /confession_prep/{document=**}             { allow read, write: if estConnecte(); }
+    match /bible_plans/{document=**}                 { allow read, write: if estConnecte(); }
+    match /resources/{document=**}                   { allow read, write: if estConnecte(); }
+    match /addresses/{document=**}                   { allow read, write: if estConnecte(); }
+    match /deals/{document=**}                       { allow read, write: if estConnecte(); }
+    match /events/{document=**}                      { allow read, write: if estConnecte(); }
+    match /annonces/{document=**}                    { allow read, write: if estConnecte(); }
+    match /fraternities/{document=**}                { allow read, write: if estConnecte(); }
+    match /aide_besoins/{document=**}                { allow read, write: if estConnecte(); }
+
+    // Défis : le compteur public de participants est incrémenté par le client
+    // quand un membre relève le défi ; sa propre progression reste, elle, dans
+    // `users/{uid}/challenges`.
+    match /challenges/{document=**}                  { allow read, write: if estConnecte(); }
+
+    // Quiz et jeux, questions comprises (sous-collection `questions`).
+    match /gamification_quizzes/{document=**}        { allow read, write: if estConnecte(); }
+    match /gamification_quiz_categories/{document=**} { allow read, write: if estConnecte(); }
+    match /gamification_games/{document=**}          { allow read, write: if estConnecte(); }
+    match /gamification_daily_challenge/{document=**} { allow read, write: if estConnecte(); }
+
+    // Classement : chaque joueur y écrit sa propre ligne, et l'application
+    // purge les faux joueurs laissés par les premières versions.
+    match /gamification_leaderboard/{document=**}    { allow read, write: if estConnecte(); }
+
+    // ---------------------------------------------------------------------
+    // 3. Contenus déposés par les membres
+    // ---------------------------------------------------------------------
+
+    // Publications du fil d'actualité. Le document ne garde pas l'identifiant
+    // de son auteur : la suppression est donc fermée à tous côté client plutôt
+    // que confiée à n'importe quel membre.
+    match /posts/{postId} {
+      allow read: if estConnecte();
+      allow create: if estConnecte();
+      allow update: if estConnecte(); // compteur de « j'aime »
+      allow delete: if false;
+    }
+
+    // Intentions communautaires : chacun peut en déposer une et s'unir à
+    // celles des autres (le compteur monte), personne ne peut en effacer.
+    match /intentions/{intentionId} {
+      allow read: if estConnecte();
+      allow create: if estConnecte();
+      allow update: if estConnecte();
+      allow delete: if false;
+    }
+
+    // Témoignages : on ne publie qu'en son propre nom, et on ne supprime que
+    // ce qu'on a écrit. La mise à jour reste ouverte pour le compteur de
+    // « j'aime », qui est incrémenté par les autres membres.
+    match /temoignages/{temoignageId} {
+      allow read: if estConnecte();
+      allow create: if auteurEstLAppelant();
+      allow update: if estConnecte();
+      allow delete: if auteurDuDocument();
+    }
+
+    // Sondage de la semaine. Le compteur de voix vit sur le document public ;
+    // le détail de qui a voté quoi reste dans `users/{uid}/votes`, donc hors
+    // de portée des autres membres.
+    match /sondages/{sondageId} {
+      allow read: if estConnecte();
+      allow create: if estConnecte(); // amorçage par le client
+      allow update: if estConnecte(); // une voix de plus
+      allow delete: if false;
+    }
+
+    // Avis de fin de parcours. L'identifiant du document contient l'uid de son
+    // auteur (`<parcoursId>__<uid>`), ce qui garantit à lui seul qu'un membre
+    // n'a qu'un avis par parcours ; la règle vérifie en plus qu'il ne signe pas
+    // au nom d'un autre.
+    match /parcours_avis/{avisId} {
+      allow read: if estConnecte();
+      allow create, update: if auteurEstLAppelant();
+      allow delete: if auteurDuDocument();
+    }
+
+    // Demandes d'écoute et d'accompagnement.
+    //
+    // Les données les plus sensibles de l'application : un membre peut y
+    // décrire un deuil, une dépendance ou des violences subies. Seul leur
+    // auteur y a accès, en lecture comme en écriture. Le suivi par l'équipe se
+    // fera depuis la console ou un back-office authentifié côté serveur, hors
+    // de portée de ces règles.
+    match /demandes_ecoute/{demandeId} {
+      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
+      allow update: if request.auth != null
+                    && resource.data.uid == request.auth.uid
+                    && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------------
+    // Refus par défaut
+    // ---------------------------------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

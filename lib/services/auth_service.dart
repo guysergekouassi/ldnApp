@@ -106,6 +106,114 @@ class AuthService {
     }
   }
 
+  /// Vrai quand la session en cours est un compte invité (connexion anonyme).
+  bool get isGuest => _auth.currentUser?.isAnonymous ?? false;
+
+  /// Connexion sans compte.
+  ///
+  /// On ouvre un vrai compte anonyme Firebase plutôt qu'une session locale :
+  /// la progression (parcours, régularité, intentions) est enregistrée comme
+  /// pour un membre, et peut être rattachée plus tard à un compte définitif
+  /// par [lierCompteEmail] ou [lierCompteGoogle] sans rien perdre.
+  ///
+  /// Prérequis : activer le fournisseur « Anonyme » dans Firebase Auth.
+  Future<User?> signInAnonymously() async {
+    try {
+      final result = await _auth.signInAnonymously();
+      final user = result.user;
+
+      if (user != null) {
+        final userDoc = await _db.collection('users').doc(user.uid).get();
+        if (!userDoc.exists) {
+          await _db.collection('users').doc(user.uid).set({
+            'uid': user.uid,
+            'fullName': 'Invité',
+            'email': '',
+            'isGuest': true,
+            'createdAt': FieldValue.serverTimestamp(),
+            'photoUrl': '',
+          });
+        }
+      }
+      return user;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Transforme le compte invité en compte email définitif.
+  ///
+  /// L'identifiant Firebase reste le même : tout ce que l'invité a enregistré
+  /// lui reste acquis. Si la session n'est pas anonyme, on retombe sur une
+  /// inscription classique.
+  Future<User?> lierCompteEmail(String name, String email, String password) async {
+    final user = _auth.currentUser;
+    if (user == null || !user.isAnonymous) {
+      return signUpWithEmailAndPassword(name, email, password);
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(email: email, password: password);
+      final result = await user.linkWithCredential(credential);
+      final lie = result.user;
+
+      if (lie != null) {
+        await _db.collection('users').doc(lie.uid).set({
+          'uid': lie.uid,
+          'fullName': name,
+          'email': email,
+          'isGuest': false,
+        }, SetOptions(merge: true));
+        await lie.updateDisplayName(name);
+      }
+      return lie;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  /// Rattache le compte invité à un compte Google, en conservant sa progression.
+  Future<User?> lierCompteGoogle() async {
+    final user = _auth.currentUser;
+    if (user == null || !user.isAnonymous) return signInWithGoogle();
+
+    try {
+      OAuthCredential credential;
+
+      if (kIsWeb) {
+        final result = await user.linkWithPopup(GoogleAuthProvider());
+        await _enregistrerProfilGoogle(result.user);
+        return result.user;
+      }
+
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return null; // annulé par l'utilisateur
+
+      final googleAuth = await googleUser.authentication;
+      credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final result = await user.linkWithCredential(credential);
+      await _enregistrerProfilGoogle(result.user);
+      return result.user;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> _enregistrerProfilGoogle(User? user) async {
+    if (user == null) return;
+    await _db.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'fullName': user.displayName ?? '',
+      'email': user.email ?? '',
+      'photoUrl': user.photoURL ?? '',
+      'isGuest': false,
+    }, SetOptions(merge: true));
+  }
+
   // Envoi d'un email de réinitialisation du mot de passe
   Future<void> sendPasswordResetEmail(String email) async {
     try {

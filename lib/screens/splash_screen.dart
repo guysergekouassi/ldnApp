@@ -26,7 +26,14 @@ class _SplashScreenState extends State<SplashScreen> {
   /// Ces appels attendaient auparavant devant la navigation : hors ligne ou si
   /// les règles de sécurité refusaient l'accès, ils ne rendaient jamais la main
   /// et l'application restait bloquée sur l'écran de démarrage.
+  ///
+  /// Ils ne partent que si une session est déjà ouverte : les règles Firestore
+  /// réservent l'écriture aux membres connectés, et un compte tout neuf
+  /// verrait sinon ces trois amorçages refusés en silence. Le relais est pris
+  /// par `HomeScreen`, qui les rejoue une fois la connexion faite.
   void _amorcerContenuEnArrierePlan() {
+    if (FirebaseAuth.instance.currentUser == null) return;
+
     Future(() async {
       try {
         await _firestoreService

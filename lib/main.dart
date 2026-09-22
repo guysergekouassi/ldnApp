@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
@@ -6,6 +8,28 @@ import 'services/notification_service.dart';
 import 'package:provider/provider.dart';
 import 'providers/theme_provider.dart';
 import 'responsive.dart';
+
+/// Branche l'application sur les émulateurs Firebase locaux.
+///
+/// Activé uniquement par `--dart-define=USE_FIREBASE_EMULATOR=true` : sans ce
+/// drapeau, rien ne change et l'application parle au vrai projet. Cela permet
+/// de lancer et de piloter l'app — se connecter, semer du contenu, parcourir
+/// les écrans — sans écrire une seule ligne dans la base de production.
+///
+///     firebase emulators:start --only auth,firestore
+///     flutter run --dart-define=USE_FIREBASE_EMULATOR=true
+const bool _utiliserEmulateurs = bool.fromEnvironment('USE_FIREBASE_EMULATOR');
+
+/// Hôte des émulateurs. À passer à `10.0.2.2` pour l'émulateur Android, dont
+/// `localhost` désigne le téléphone virtuel et non la machine de développement.
+const String _hoteEmulateurs =
+    String.fromEnvironment('FIREBASE_EMULATOR_HOST', defaultValue: '127.0.0.1');
+
+Future<void> _brancherEmulateurs() async {
+  await FirebaseAuth.instance.useAuthEmulator(_hoteEmulateurs, 9099);
+  FirebaseFirestore.instance.useFirestoreEmulator(_hoteEmulateurs, 8080);
+  debugPrint("Émulateurs Firebase actifs sur $_hoteEmulateurs.");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,6 +43,7 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     ).timeout(const Duration(seconds: 20));
+    if (_utiliserEmulateurs) await _brancherEmulateurs();
   } catch (e) {
     erreurDemarrage = "Connexion à Firebase impossible.\n\n$e";
     debugPrint("Échec de l'initialisation Firebase : $e");

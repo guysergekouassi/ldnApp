@@ -72,7 +72,7 @@ class AllEventsScreen extends StatelessWidget {
                             children: [
                               const Icon(Icons.access_time, size: 12, color: Colors.grey),
                               const SizedBox(width: 4),
-                              Text(event.time, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                              Text(event.time, style: const TextStyle(color: Colors.grey, fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
                               const SizedBox(width: 10),
                               const Icon(Icons.location_on_outlined, size: 12, color: Colors.grey),
                               const SizedBox(width: 4),

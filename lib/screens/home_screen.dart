@@ -11,6 +11,8 @@ import 'mon_espace_screen.dart';
 import 'bons_plans_screen.dart';
 import 'quiz_jeux_screen.dart';
 import 'evangile_du_jour_screen.dart';
+import 'examen_soir_screen.dart';
+import 'meditation_screen.dart';
 import 'chapelet_guide_screen.dart';
 import 'carnet_spirituel_screen.dart';
 import '../services/firestore_service.dart';
@@ -24,6 +26,15 @@ import '../models/parcours_content_model.dart';
 import 'parcours_detail_screen.dart';
 import '../components/app_bottom_nav_bar.dart';
 import '../components/user_avatar.dart';
+import '../components/ldn_signature.dart';
+import '../components/bandeau_temps_liturgique.dart';
+import '../models/challenge_model.dart';
+import '../models/temoignage_model.dart';
+import 'temoignages_screen.dart';
+import 'bible_plans_screen.dart';
+import 'bible_plan_detail_screen.dart';
+import 'divine_misericorde_screen.dart';
+import '../models/bible_plan_model.dart';
 
 class HomeScreen extends StatefulWidget {
   /// Onglet affiché à l'ouverture. Permet aux écrans secondaires de revenir
@@ -68,24 +79,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     _setUpNotifications();
 
-    // Initialiser le contenu des parcours s'il n'existe pas encore dans Firebase
-    _firestoreService.checkAndInitializeParcoursContent();
-    // Le chemin Métanoïa n'était semé nulle part : sans cela, ses niveaux et
-    // ses leçons restaient vides.
-    _firestoreService.checkAndInitializeMetanoia();
-    // Initialiser les défis s'ils n'existent pas
-    _firestoreService.checkAndInitializeChallenges();
-    _firestoreService.checkAndInitializeEvents();
-    _firestoreService.checkAndInitializeAnnonces();
-    _firestoreService.checkAndInitializeFraternity();
-    _firestoreService.checkAndInitializeDailyContent();
-    // Catalogue de versets : sans lui, le verset du jour ne tournerait pas.
-    _firestoreService.checkAndInitializeVersets();
-    _firestoreService.checkAndInitializeDailyTasks();
-    _firestoreService.checkAndInitializeNeuvaines();
-    _firestoreService.checkAndInitializePrayerActivities();
-    _firestoreService.checkAndInitializeExamenConscience();
-    _firestoreService.checkAndInitializeConfessionContent();
+    _amorcerContenu();
+    _amorcerContenuApresConnexion();
+  }
+
+  /// Amorce le contenu livré avec l'application, puis applique les migrations.
+  ///
+  /// L'ordre compte. Lancées en parallèle, les migrations décidaient sur une
+  /// collection encore vide et réinséraient des documents que l'amorçage était
+  /// en train d'écrire : les activités de prière et les groupes se
+  /// retrouvaient en double. Elles attendent donc désormais la fin de
+  /// l'amorçage.
+  Future<void> _amorcerContenu() async {
+    try {
+      await Future.wait(<Future<void>>[
+        _firestoreService.checkAndInitializeParcoursContent(),
+        // Le chemin Métanoïa n'était semé nulle part : sans cela, ses niveaux
+        // et ses leçons restaient vides.
+        _firestoreService.checkAndInitializeMetanoia(),
+        _firestoreService.checkAndInitializeChallenges(),
+        _firestoreService.checkAndInitializeEvents(),
+        _firestoreService.checkAndInitializeAnnonces(),
+        _firestoreService.checkAndInitializeFraternity(),
+        _firestoreService.checkAndInitializeDailyContent(),
+        // Catalogue de versets : sans lui, le verset du jour ne tournerait pas.
+        _firestoreService.checkAndInitializeVersets(),
+        _firestoreService.checkAndInitializeDailyTasks(),
+        _firestoreService.checkAndInitializeNeuvaines(),
+        _firestoreService.checkAndInitializePrayerActivities(),
+        _firestoreService.checkAndInitializeExamenConscience(),
+        _firestoreService.checkAndInitializeConfessionContent(),
+        // Sondage de la semaine : sans amorçage, la carte « question de la
+        // semaine » ne s'afficherait jamais.
+        _firestoreService.checkAndInitializeSondages(),
+      ]);
+    } catch (e) {
+      // Un amorçage partiel n'empêche pas l'application de fonctionner : il
+      // sera réessayé au prochain lancement.
+      debugPrint("Amorçage du contenu incomplet : $e");
+    }
+
+    // Complète les documents déjà en base : les routines ci-dessus n'amorcent
+    // qu'un compte neuf et laisseraient les installations existantes sans les
+    // champs ajoutés depuis.
+    await _firestoreService.appliquerMigrationsContenu();
+  }
+
+  /// Contenu volumineux, amorcé en tâche de fond : l'affichage de l'accueil ne
+  /// doit pas l'attendre. Les échecs sont avalés, comme pour les autres
+  /// amorçages — une collection non semée n'empêche pas l'application de
+  /// fonctionner, elle sera réessayée au lancement suivant.
+  void _amorcerContenuApresConnexion() {
+    Future(() async {
+      try {
+        await _firestoreService
+            .checkAndInitializeBonsPlansAndAddresses()
+            .timeout(const Duration(seconds: 15));
+        await _firestoreService
+            .checkAndInitializeQuizAndGames()
+            .timeout(const Duration(seconds: 20));
+        await _firestoreService
+            .purgeLeaderboardMockPlayers()
+            .timeout(const Duration(seconds: 15));
+      } catch (e) {
+        debugPrint("Amorçage du contenu incomplet : $e");
+      }
+    });
   }
 
   @override
@@ -192,15 +251,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Column(
               children: [
                 const SizedBox(height: 20),
+                // `_today` change au passage de minuit : le bandeau suit la
+                // bascule de journée sans relancer l'application.
+                BandeauTempsLiturgique(key: ValueKey(_today)),
+                const SizedBox(height: 20),
                 _buildVersetDuJour(),
                 const SizedBox(height: 20),
                 _buildParcours(),
                 const SizedBox(height: 20),
+                _buildChallenge(),
+                const SizedBox(height: 20),
                 _buildIntention(),
+                const SizedBox(height: 20),
+                _buildTemoignage(),
                 const SizedBox(height: 20),
                 _buildContinuer(),
                 const SizedBox(height: 20),
                 _buildCarnetSpirituel(),
+                const SizedBox(height: 20),
+                _buildLectureBiblique(),
                 const SizedBox(height: 20),
                 Row(
                   children: [
@@ -223,7 +292,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     ),
                   ],
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 15),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildMenuShortcut(
+                        "Divine Miséricorde",
+                        Icons.favorite_border,
+                        const Color(0xFF5B4FC8),
+                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => const DivineMisericordeScreen())),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: _buildMenuShortcut(
+                        "Lire la Bible",
+                        Icons.menu_book,
+                        const Color(0xFF16A34A),
+                        () => Navigator.push(context, MaterialPageRoute(builder: (context) => const BiblePlansScreen())),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const LdnSignature(),
               ],
             ),
           ),
@@ -476,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             child: Text("Mon parcours aujourd'hui", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)), overflow: TextOverflow.ellipsis),
                           ),
                           const SizedBox(width: 5),
-                          Text("${(progress * 100).toInt()} %", style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                          Text("${(progress * 100).toInt()} %", style: const TextStyle(color: Colors.orange, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                           SizedBox(
                             width: 32,
                             height: 32,
@@ -664,6 +756,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => EvangileDuJourScreen()));
                 } else if (task.action == 'chapelet') {
                   Navigator.push(context, MaterialPageRoute(builder: (context) => ChapeletGuideScreen()));
+                } else if (task.action == 'meditation') {
+                  Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (context) => const MeditationScreen()),
+                  ).then((enregistre) {
+                    if (enregistre == true && !completed) {
+                      _toggleTask(task, completed, totalTasks, completedCount);
+                    }
+                  });
+                } else if (task.action == 'examen') {
+                  // L'examen coche lui-même l'étape une fois enregistré, pour
+                  // que la case ne soit pas validée sur une simple ouverture.
+                  Navigator.push<bool>(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ExamenSoirScreen()),
+                  ).then((enregistre) {
+                    if (enregistre == true && !completed) {
+                      _toggleTask(task, completed, totalTasks, completedCount);
+                    }
+                  });
                 } else {
                   _toggleTask(task, completed, totalTasks, completedCount);
                 }
@@ -736,13 +848,583 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  /// Lundi de la semaine en cours : sert d'ancre à la rotation hebdomadaire du
+  /// défi mis en avant, pour qu'il ne change pas d'un jour à l'autre.
+  DateTime _debutDeSemaine() {
+    final maintenant = DateTime.now();
+    final jour = DateTime(maintenant.year, maintenant.month, maintenant.day);
+    return jour.subtract(Duration(days: jour.weekday - 1));
+  }
+
+  /// Défi du moment.
+  ///
+  /// Trois états : le membre suit un défi (progression et validation du jour),
+  /// il n'en suit aucun (proposition du défi de la semaine), ou aucun défi
+  /// n'est publié — la carte disparaît alors plutôt que d'afficher un vide.
+  /// Lecture biblique en cours sur l'accueil.
+  ///
+  /// Quand aucun plan n'est commencé, la carte invite à en choisir un plutôt
+  /// que de disparaître : c'est justement là qu'il faut donner l'impulsion.
+  Widget _buildLectureBiblique() {
+    if (_uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<BiblePlanProgress?>(
+      stream: _firestoreService.getBiblePlanEnCours(_uid!),
+      builder: (context, snapshot) {
+        final plan = snapshot.data;
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => plan == null
+                  ? const BiblePlansScreen()
+                  : BiblePlanDetailScreen(planId: plan.planId),
+            ),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECFDF3),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                      child: const Icon(Icons.menu_book, color: Color(0xFF16A34A), size: 16),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        "Ma lecture de la Bible",
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Color(0xFF16A34A), size: 18),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (plan == null) ...[
+                  const Text(
+                    "Choisis un plan de lecture",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 5),
+                  const Text(
+                    "Un chapitre par jour, une référence et un point d'attention. Sept, seize ou vingt et un jours.",
+                    style: TextStyle(color: Colors.black54, fontSize: 12, height: 1.4),
+                  ),
+                ] else ...[
+                  Text(
+                    plan.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(5),
+                          child: LinearProgressIndicator(
+                            value: plan.progression,
+                            backgroundColor: Colors.white,
+                            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF16A34A)),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        "${plan.joursLus}/${plan.durationDays}",
+                        style: const TextStyle(color: Color(0xFF16A34A), fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    "Prochaine lecture : jour ${plan.prochainJour}.",
+                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildChallenge() {
+    if (_uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<ChallengeProgress?>(
+      stream: _firestoreService.getChallengeEnCours(_uid!),
+      builder: (context, progressSnapshot) {
+        final enCours = progressSnapshot.data;
+        if (enCours != null) return _buildChallengeEnCours(enCours);
+
+        return StreamBuilder<List<Challenge>>(
+          stream: _firestoreService.getChallenges(),
+          builder: (context, challengesSnapshot) {
+            final challenges = challengesSnapshot.data ?? <Challenge>[];
+            if (challenges.isEmpty) return const SizedBox.shrink();
+
+            // Rotation hebdomadaire sur le catalogue : la carte change toute
+            // seule, sans intervention côté contenu.
+            final propose = challenges[
+                FirestoreService.indexDuJour(challenges.length, jour: _debutDeSemaine())];
+            return _buildChallengePropose(propose);
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCarteChallenge({required List<Widget> children}) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFF1E0), Color(0xFFFFE4E4)],
+        ),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+    );
+  }
+
+  Widget _buildEnTeteChallenge(String titre, String sousTitre) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+          child: const Icon(Icons.local_fire_department, color: Colors.deepOrange, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                titre,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.deepOrange, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                sousTitre,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChallengeEnCours(ChallengeProgress defi) {
+    final valideAujourdHui = defi.estValideLe(_today);
+    final restants = (defi.durationDays - defi.joursValides).clamp(0, defi.durationDays);
+
+    return _buildCarteChallenge(
+      children: [
+        _buildEnTeteChallenge("MON DÉFI EN COURS", defi.title),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: LinearProgressIndicator(
+                  value: defi.progression,
+                  backgroundColor: Colors.white,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.deepOrange),
+                  minHeight: 6,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              "${defi.joursValides}/${defi.durationDays}",
+              style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.bold, fontSize: 12),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          restants == 0
+              ? "Dernière ligne droite, tiens bon !"
+              : "Encore $restants jour${restants > 1 ? 's' : ''} pour aller au bout.",
+          style: const TextStyle(color: Colors.black54, fontSize: 12),
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: valideAujourdHui ? Colors.green : Colors.deepOrange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: valideAujourdHui ? null : () => _validerJourChallenge(defi),
+                icon: Icon(
+                  valideAujourdHui ? Icons.check_circle : Icons.check_circle_outline,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                label: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    valideAujourdHui ? "Journée validée ✓" : "Valider ma journée",
+                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 40,
+              child: PopupMenuButton<String>(
+                tooltip: "Options du défi",
+                icon: const Icon(Icons.more_vert, size: 20, color: Colors.black45),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                onSelected: (_) => _quitterChallenge(defi),
+                itemBuilder: (context) => const [
+                  PopupMenuItem<String>(
+                    value: 'quitter',
+                    child: Row(
+                      children: [
+                        Icon(Icons.flag_outlined, size: 18, color: Colors.red),
+                        SizedBox(width: 10),
+                        Text("Abandonner ce défi", style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChallengePropose(Challenge challenge) {
+    return _buildCarteChallenge(
+      children: [
+        _buildEnTeteChallenge("DÉFI DE LA SEMAINE", challenge.title),
+        const SizedBox(height: 12),
+        Text(
+          challenge.description,
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(color: Colors.black54, fontSize: 12, height: 1.4),
+        ),
+        const SizedBox(height: 14),
+        Row(
+          children: [
+            const Icon(Icons.schedule, size: 14, color: Colors.black45),
+            const SizedBox(width: 5),
+            Text(
+              "${challenge.durationDays} jours",
+              style: const TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 15),
+            const Icon(Icons.people_outline, size: 14, color: Colors.black45),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                "${challenge.participants} participants",
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 11, color: Colors.black45, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.deepOrange,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            onPressed: () => _rejoindreChallenge(challenge),
+            icon: const Icon(Icons.local_fire_department, color: Colors.white, size: 18),
+            label: const Text(
+              "Relever le défi",
+              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _rejoindreChallenge(Challenge challenge) async {
+    if (_uid == null) return;
+
+    final rejoint = await _firestoreService.rejoindreChallenge(_uid!, challenge);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(rejoint
+            ? "C'est parti pour ${challenge.durationDays} jours ! 🔥"
+            : "Tu participes déjà à ce défi."),
+        backgroundColor: rejoint ? Colors.green : Colors.orange,
+      ),
+    );
+  }
+
+  Future<void> _validerJourChallenge(ChallengeProgress defi) async {
+    if (_uid == null) return;
+
+    final valide = await _firestoreService.validerJourChallenge(_uid!, defi.challengeId);
+    if (!mounted) return;
+
+    // Le défi se termine à la dernière journée validée : on félicite plutôt
+    // que d'annoncer sèchement la disparition de la carte.
+    final termine = valide && defi.joursValides + 1 >= defi.durationDays;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(!valide
+            ? "Journée déjà validée."
+            : termine
+                ? "Défi terminé, bravo ! 🎉"
+                : "Journée validée, continue ! 🔥"),
+        backgroundColor: valide ? Colors.green : Colors.grey,
+      ),
+    );
+  }
+
+  Future<void> _quitterChallenge(ChallengeProgress defi) async {
+    if (_uid == null) return;
+
+    final confirme = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Abandonner ce défi ?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        content: Text('"${defi.title}" et ta progression seront effacés.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text("Continuer le défi", style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text("Abandonner", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirme != true) return;
+    await _firestoreService.quitterChallenge(_uid!, defi.challengeId);
+  }
+
+  /// Témoignage mis en avant sur l'accueil.
+  ///
+  /// Un seul témoignage à la fois, choisi par rotation quotidienne : la page
+  /// d'accueil reste lisible et le contenu change chaque jour.
+  Widget _buildTemoignage() {
+    return StreamBuilder<List<Temoignage>>(
+      stream: _firestoreService.getTemoignages(),
+      builder: (context, snapshot) {
+        final temoignages = snapshot.data ?? <Temoignage>[];
+        if (temoignages.isEmpty) return _buildInvitationTemoignage();
+
+        final temoignage = temoignages[FirestoreService.indexDuJour(temoignages.length)];
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F0FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.auto_awesome, color: Color(0xFF5B4FC8), size: 16),
+                  ),
+                  const SizedBox(width: 10),
+                  const Expanded(
+                    child: Text(
+                      "Témoignage",
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: Color(0xFF5B4FC8), fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const TemoignagesScreen()),
+                    ),
+                    child: const Text(
+                      "Voir tout",
+                      style: TextStyle(color: Color(0xFF5B4FC8), fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (temoignage.title.isNotEmpty) ...[
+                Text(
+                  temoignage.title,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A), height: 1.3),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Text(
+                temoignage.content,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, color: Colors.black87, height: 1.5),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: const Color(0xFFF3F0FF),
+                    child: Text(
+                      temoignage.initiales,
+                      style: const TextStyle(color: Color(0xFF5B4FC8), fontWeight: FontWeight.bold, fontSize: 11),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      temoignage.authorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF5B4FC8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                  ),
+                  onPressed: () => showTemoignageForm(context),
+                  icon: const Icon(Icons.edit_outlined, color: Color(0xFF5B4FC8), size: 16),
+                  label: const Text(
+                    "Partager mon témoignage",
+                    style: TextStyle(color: Color(0xFF5B4FC8), fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Affiché tant qu'aucun témoignage n'est publié : la carte invite à ouvrir
+  /// le mur plutôt que de laisser un espace vide sur l'accueil.
+  Widget _buildInvitationTemoignage() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F0FF),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.auto_awesome, color: Color(0xFF5B4FC8), size: 28),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Raconte ce que Dieu a fait",
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  "Ton témoignage peut relever quelqu'un aujourd'hui.",
+                  style: TextStyle(color: Colors.black54, fontSize: 12),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5B4FC8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                    minimumSize: const Size(0, 34),
+                  ),
+                  onPressed: () => showTemoignageForm(context),
+                  child: const Text(
+                    "Témoigner",
+                    style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildIntention() {
-    return StreamBuilder<List<Intention>>(
-      stream: FirestoreService().getIntentions(),
+    return StreamBuilder<Set<String>>(
+      stream: _uid != null
+          ? _firestoreService.getPinnedIntentionIds(_uid!)
+          : Stream.value(<String>{}),
+      builder: (context, epingleesSnapshot) {
+        final epinglees = epingleesSnapshot.data ?? <String>{};
+
+        return StreamBuilder<List<Intention>>(
+      stream: _firestoreService.getIntentions(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.isEmpty) return const SizedBox.shrink();
 
-        final intention = snapshot.data!.first;
+        // L'accueil ne montre qu'une intention : celle que le membre a
+        // épinglée passe avant la plus récente.
+        final intention = FirestoreService.trierAvecEpinglees(snapshot.data!, epinglees).first;
+        final estEpinglee = epinglees.contains(intention.id);
 
         return Container(
           padding: const EdgeInsets.all(20),
@@ -768,7 +1450,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           child: const Icon(Icons.people, color: Colors.orange, size: 16),
                         ),
                         const SizedBox(width: 10),
-                        const Expanded(child: Text("Intention communautaire", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis)),
+                        Expanded(
+                          child: Text(
+                            estEpinglee ? "Intention épinglée" : "Intention communautaire",
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: estEpinglee ? Colors.orange : Colors.grey,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 30,
+                          height: 30,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            splashRadius: 18,
+                            tooltip: estEpinglee ? "Désépingler" : "Épingler cette intention",
+                            icon: Icon(
+                              estEpinglee ? Icons.push_pin : Icons.push_pin_outlined,
+                              size: 18,
+                              color: estEpinglee ? Colors.orange : Colors.grey.shade400,
+                            ),
+                            onPressed: () => _basculerEpingleIntention(intention),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -806,6 +1513,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         );
       }
+    );
+      },
+    );
+  }
+
+  Future<void> _basculerEpingleIntention(Intention intention) async {
+    if (_uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Connecte-toi pour épingler une intention."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final epingle = await _firestoreService.togglePinIntention(_uid!, intention.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(epingle
+            ? "Intention épinglée : elle reste sur ton accueil 📌"
+            : "Intention désépinglée."),
+        backgroundColor: epingle ? Colors.orange : Colors.grey,
+        duration: const Duration(seconds: 2),
+      ),
     );
   }
 
@@ -911,7 +1644,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 ),
                               ),
                               const SizedBox(width: 10),
-                              Text("${(percentage * 100).toInt()} %", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                              Text("${(percentage * 100).toInt()} %", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                             ],
                           ),
                         ] else ...[

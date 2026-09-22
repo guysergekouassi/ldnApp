@@ -11,6 +11,10 @@ import '../services/share_service.dart';
 import 'create_post_screen.dart';
 import 'all_posts_screen.dart';
 import 'all_events_screen.dart';
+import 'temoignages_screen.dart';
+import 'groupes_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../models/sondage_model.dart';
 
 class CommunauteScreen extends StatelessWidget {
   CommunauteScreen({Key? key}) : super(key: key);
@@ -50,6 +54,8 @@ class CommunauteScreen extends StatelessWidget {
                 children: [
                   const SizedBox(height: 10),
                   _buildFilDActualite(context),
+                  const SizedBox(height: 15),
+                  _buildSondage(context),
                   const SizedBox(height: 15),
                   _buildDefisChallenges(),
                   const SizedBox(height: 15),
@@ -229,7 +235,11 @@ class CommunauteScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 15),
-          StreamBuilder<List<Post>>(
+          StreamBuilder<Set<String>>(
+            stream: _firestoreService.getLikedPostIds(),
+            builder: (context, aimesSnapshot) {
+          final aimes = aimesSnapshot.data ?? <String>{};
+          return StreamBuilder<List<Post>>(
             stream: _firestoreService.getPosts(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -240,6 +250,7 @@ class CommunauteScreen extends StatelessWidget {
               }
 
               final post = snapshot.data!.first;
+              final estAime = aimes.contains(post.id);
               final dateFormat = DateFormat('dd/MM HH:mm');
 
               return Column(
@@ -281,7 +292,7 @@ class CommunauteScreen extends StatelessWidget {
                             const SizedBox(height: 2),
                             Row(
                               children: [
-                                Text(dateFormat.format(post.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                Text(dateFormat.format(post.createdAt), style: const TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
                                 const SizedBox(width: 4),
                                 const Icon(Icons.public, color: Colors.grey, size: 10),
                               ],
@@ -309,30 +320,33 @@ class CommunauteScreen extends StatelessWidget {
                             const SizedBox(height: 10),
                             Row(
                               children: [
-                                InkWell(
-                                  onTap: () {
-                                    _firestoreService.toggleLikePost(post.id);
-                                  },
-                                  child: Row(
-                                    children: [
-                                      const Icon(Icons.favorite, color: Colors.red, size: 16),
-                                      const SizedBox(width: 5),
-                                      Text("${post.likes}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                    ],
-                                  ),
+                                LikeButton(
+                                  estAime: estAime,
+                                  compteur: post.likes,
+                                  onTap: () => _firestoreService.toggleLikePost(post.id),
                                 ),
                                 const Spacer(),
                                 InkWell(
+                                  borderRadius: BorderRadius.circular(20),
                                   onTap: () => ShareService.sharePost(
                                     authorName: post.authorName,
                                     content: post.content,
                                   ),
-                                  child: Row(
-                                    children: const [
-                                      Icon(Icons.reply, color: Colors.grey, size: 16),
-                                      SizedBox(width: 5),
-                                      Text("Partager", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                                    ],
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: const Color(0xFFE5E7EB)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: const [
+                                        Icon(Icons.reply, color: Colors.grey, size: 16),
+                                        SizedBox(width: 5),
+                                        Text("Partager", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
                                   ),
                                 ),
                                 const Spacer(),
@@ -364,8 +378,178 @@ class CommunauteScreen extends StatelessWidget {
                 ],
               );
             }
+          );
+            },
           ),
         ],
+      ),
+    );
+  }
+
+  /// Sondage de la semaine : une question courte, un résultat immédiat.
+  ///
+  /// Le vote est le geste d'engagement le moins coûteux qui existe — un appui,
+  /// et l'on voit aussitôt où se situe la communauté. La carte disparaît tant
+  /// qu'aucun sondage n'est publié, plutôt que d'afficher un cadre vide.
+  Widget _buildSondage(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
+    return StreamBuilder<Sondage?>(
+      stream: _firestoreService.getSondageEnCours(),
+      builder: (context, sondageSnapshot) {
+        final sondage = sondageSnapshot.data;
+        if (sondage == null) return const SizedBox.shrink();
+
+        return StreamBuilder<int?>(
+          stream: uid != null
+              ? _firestoreService.getMonVote(uid, sondage.id)
+              : Stream.value(null),
+          builder: (context, voteSnapshot) {
+            final monVote = voteSnapshot.data;
+
+            return Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader("2", "La question de la semaine", sondage.contexte),
+                  const SizedBox(height: 15),
+                  Text(
+                    sondage.question,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A), height: 1.4),
+                  ),
+                  const SizedBox(height: 14),
+                  ...List.generate(
+                    sondage.options.length,
+                    (i) => _buildOptionSondage(context, sondage, i, monVote, uid),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    sondage.totalVoix == 0
+                        ? "Personne n'a encore répondu. Ouvre le bal."
+                        : "${sondage.totalVoix} réponse${sondage.totalVoix > 1 ? 's' : ''}"
+                            "${monVote == null ? ' · ton avis manque' : ''}",
+                    style: const TextStyle(color: Colors.grey, fontSize: 10),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildOptionSondage(
+    BuildContext context,
+    Sondage sondage,
+    int index,
+    int? monVote,
+    String? uid,
+  ) {
+    final aVote = monVote != null;
+    final estMonChoix = monVote == index;
+    final part = sondage.partDe(index);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: aVote ? null : () => _voter(context, sondage, index, uid),
+        child: Stack(
+          children: [
+            // Barre de résultat : affichée seulement après le vote, pour ne pas
+            // influencer la réponse de celui qui n'a pas encore choisi.
+            if (aVote)
+              Positioned.fill(
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: part,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: estMonChoix
+                          ? const Color(0xFF5B4FC8).withOpacity(0.18)
+                          : const Color(0xFFE5E7EB),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: estMonChoix ? const Color(0xFF5B4FC8) : const Color(0xFFE5E7EB),
+                  width: estMonChoix ? 1.5 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    estMonChoix
+                        ? Icons.check_circle
+                        : (aVote ? Icons.circle_outlined : Icons.radio_button_unchecked),
+                    size: 16,
+                    color: estMonChoix ? const Color(0xFF5B4FC8) : Colors.grey.shade400,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      sondage.options[index],
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF0F172A),
+                        fontWeight: estMonChoix ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+                  if (aVote) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      "${(part * 100).round()} %",
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: estMonChoix ? const Color(0xFF5B4FC8) : Colors.grey,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _voter(BuildContext context, Sondage sondage, int index, String? uid) async {
+    if (uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Connecte-toi pour donner ton avis."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final compte = await _firestoreService.voterSondage(uid, sondage, index);
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(compte ? "Merci, ton avis est pris en compte." : "Tu as déjà répondu."),
+        backgroundColor: compte ? Colors.green : Colors.orange,
       ),
     );
   }
@@ -383,7 +567,7 @@ class CommunauteScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader("2", "Défis & challenges", "Relève des défis et grandis\nspirituellement !"),
+          _buildSectionHeader("3", "Défis & challenges", "Relève des défis et grandis\nspirituellement !"),
           const SizedBox(height: 15),
           StreamBuilder<List<Challenge>>(
             stream: _firestoreService.getChallenges(),
@@ -487,7 +671,7 @@ class CommunauteScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader("3", "Événements à venir", "Ne manque aucun rendez-vous\nimportant."),
+          _buildSectionHeader("4", "Événements à venir", "Ne manque aucun rendez-vous\nimportant."),
           const SizedBox(height: 15),
           StreamBuilder<List<AppEvent>>(
             stream: _firestoreService.getEvents(),
@@ -587,19 +771,30 @@ class CommunauteScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader("4", "Ma Fratrie", "Connecte-toi avec ton groupe local."),
+          _buildSectionHeader("5", "Mon groupe", "Connecte-toi avec ton groupe local."),
           const SizedBox(height: 15),
-          StreamBuilder<Fraternity?>(
-            stream: _firestoreService.getFraternity(),
+          // Le groupe affiché est celui que le membre a lui-même rejoint, et
+          // non plus la première fratrie de la base : personne n'était
+          // réellement inscrit dans celle qu'on lui montrait.
+          StreamBuilder<String?>(
+            stream: FirebaseAuth.instance.currentUser != null
+                ? _firestoreService.getMonGroupeId(FirebaseAuth.instance.currentUser!.uid)
+                : Stream.value(null),
+            builder: (context, monGroupeSnapshot) {
+              return StreamBuilder<List<Fraternity>>(
+            stream: _firestoreService.getGroupes(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator(color: Colors.orange));
               }
-              if (!snapshot.hasData || snapshot.data == null) {
-                return const Text("Aucune fratrie assignée.", style: TextStyle(color: Colors.grey, fontSize: 10));
-              }
 
-              final fraternity = snapshot.data!;
+              final groupes = snapshot.data ?? <Fraternity>[];
+              final monGroupeId = monGroupeSnapshot.data;
+              final miens = groupes.where((g) => g.id == monGroupeId);
+
+              if (miens.isEmpty) return _buildInvitationGroupe(context, groupes.length);
+
+              final fraternity = miens.first;
 
               return Container(
                 padding: const EdgeInsets.all(10),
@@ -630,7 +825,7 @@ class CommunauteScreen extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       child: Row(
                         children: [
-                          Text("${fraternity.memberCount} membres", style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                          Text("${fraternity.memberCount} membres", style: const TextStyle(fontSize: 12, color: Colors.grey), maxLines: 1, overflow: TextOverflow.ellipsis),
                           const SizedBox(width: 5),
                           _buildAvatarCluster(fraternity.memberCount),
                           if (fraternity.memberCount > 4) ...[
@@ -668,18 +863,77 @@ class CommunauteScreen extends StatelessWidget {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                           padding: const EdgeInsets.symmetric(vertical: 8),
                         ),
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Le chat de la fratrie sera bientôt disponible !'), backgroundColor: Colors.blue),
-                          );
-                        },
-                        child: const Text("Rejoindre la discussion", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const GroupesScreen()),
+                        ),
+                        child: const Text("Voir tous les groupes", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ],
                 ),
               );
             }
+          );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Affiché tant que le membre n'a rejoint aucun groupe : l'invitation vaut
+  /// mieux qu'un « Aucune fratrie assignée » qui n'appelle aucune action.
+  Widget _buildInvitationGroupe(BuildContext context, int nombreDeGroupes) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F0FF),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.groups_outlined, color: Color(0xFF5B4FC8), size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  nombreDeGroupes == 0
+                      ? "L'annuaire des groupes se remplit."
+                      : "Tu n'as pas encore de groupe",
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            nombreDeGroupes == 0
+                ? "Reviens dans un instant pour trouver une communauté près de chez toi."
+                : "$nombreDeGroupes groupes t'attendent : fratrie de quartier, groupe de prière, jeunes, familles…",
+            style: const TextStyle(color: Colors.black54, fontSize: 11, height: 1.4),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF5B4FC8),
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const GroupesScreen()),
+              ),
+              child: const Text(
+                "Rejoindre un groupe",
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
         ],
       ),
@@ -699,7 +953,7 @@ class CommunauteScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionHeader("5", "Annonces & informations", "Reste informé des nouvelles de la communauté."),
+          _buildSectionHeader("6", "Annonces & informations", "Reste informé des nouvelles de la communauté."),
           const SizedBox(height: 15),
           StreamBuilder<List<Annonce>>(
             stream: _firestoreService.getAnnonces(),

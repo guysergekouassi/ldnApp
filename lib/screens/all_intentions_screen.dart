@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
 import '../models/intention_model.dart';
 import 'create_intention_screen.dart';
@@ -12,6 +13,31 @@ class AllIntentionsScreen extends StatefulWidget {
 
 class _AllIntentionsScreenState extends State<AllIntentionsScreen> {
   final FirestoreService _firestoreService = FirestoreService();
+  final String? _uid = FirebaseAuth.instance.currentUser?.uid;
+
+  Future<void> _basculerEpingle(Intention intention) async {
+    if (_uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Connecte-toi pour épingler une intention."),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    final epingle = await _firestoreService.togglePinIntention(_uid!, intention.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(epingle
+            ? "Intention épinglée : elle reste en tête de ta liste 📌"
+            : "Intention désépinglée."),
+        backgroundColor: epingle ? Colors.orange : Colors.grey,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +59,14 @@ class _AllIntentionsScreenState extends State<AllIntentionsScreen> {
         backgroundColor: Colors.orange,
         child: const Icon(Icons.add, color: Colors.white),
       ),
-      body: StreamBuilder<List<Intention>>(
+      body: StreamBuilder<Set<String>>(
+        stream: _uid != null
+            ? _firestoreService.getPinnedIntentionIds(_uid!)
+            : Stream.value(<String>{}),
+        builder: (context, epingleesSnapshot) {
+          final epinglees = epingleesSnapshot.data ?? <String>{};
+
+          return StreamBuilder<List<Intention>>(
         stream: _firestoreService.getIntentions(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -43,7 +76,8 @@ class _AllIntentionsScreenState extends State<AllIntentionsScreen> {
             return const Center(child: Text("Aucune intention pour le moment.", style: TextStyle(color: Colors.grey)));
           }
 
-          final intentions = snapshot.data!;
+          // Les intentions épinglées remontent en tête du mur.
+          final intentions = FirestoreService.trierAvecEpinglees(snapshot.data!, epinglees);
 
           return ListView.separated(
             padding: const EdgeInsets.all(15),
@@ -52,12 +86,15 @@ class _AllIntentionsScreenState extends State<AllIntentionsScreen> {
             itemBuilder: (context, index) {
               final intention = intentions[index];
               final color = Color(int.parse(intention.colorHex.replaceFirst('#', '0xFF')));
+              final estEpinglee = epinglees.contains(intention.id);
 
               return Container(
                 padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(15),
+                  // Liseré orangé : repère visuel des intentions épinglées.
+                  border: estEpinglee ? Border.all(color: Colors.orange, width: 1.5) : null,
                   boxShadow: [
                     BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5)),
                   ],
@@ -83,6 +120,22 @@ class _AllIntentionsScreenState extends State<AllIntentionsScreen> {
                             maxLines: 3,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        SizedBox(
+                          width: 36,
+                          height: 36,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            splashRadius: 20,
+                            tooltip: estEpinglee ? "Désépingler" : "Épingler cette intention",
+                            icon: Icon(
+                              estEpinglee ? Icons.push_pin : Icons.push_pin_outlined,
+                              size: 20,
+                              color: estEpinglee ? Colors.orange : Colors.grey.shade400,
+                            ),
+                            onPressed: () => _basculerEpingle(intention),
                           ),
                         ),
                       ],
@@ -141,6 +194,8 @@ class _AllIntentionsScreenState extends State<AllIntentionsScreen> {
             },
           );
         }
+      );
+        },
       ),
     );
   }

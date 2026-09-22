@@ -118,7 +118,7 @@ class QuizListScreen extends StatelessWidget {
                           ),
                           const SizedBox(width: 8),
                         ],
-                        Text("$points points à gagner", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        Text("$points points à gagner", style: const TextStyle(color: Colors.grey, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),

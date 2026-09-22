@@ -16,6 +16,7 @@ class NotificationService {
   /// Plages d'identifiants réservées, pour pouvoir annuler un type de rappel
   /// sans toucher aux autres.
   static const int _prayerIdBase = 0; // 0, 1, 2 : Matin / Midi / Soir
+  static const int _misericordeId = 50;
   static const int _intentionIdBase = 100;
 
   /// Ordre d'affichage des rappels de prière, qui fixe aussi leur identifiant.
@@ -138,6 +139,25 @@ class NotificationService {
         parsed,
       );
     }
+  }
+
+  /// Active ou coupe le rappel de l'Heure de la Miséricorde, à 15 h.
+  ///
+  /// Il porte son propre identifiant : l'activer ou le couper ne touche pas
+  /// aux trois rappels de prière quotidiens.
+  Future<void> syncHeureDeLaMisericorde(bool actif) async {
+    if (!isSupported) return;
+    await init();
+
+    await _notificationsPlugin.cancel(_misericordeId);
+    if (!actif) return;
+
+    await _schedulePrayerTime(
+      _misericordeId,
+      "Heure de la Miséricorde",
+      "Il est 15 h, l'heure où le Christ a donné sa vie. Une minute pour lui. 🙏",
+      const TimeOfDay(hour: 15, minute: 0),
+    );
   }
 
   /// Convertit « 06:30 » en [TimeOfDay]. Renvoie null si la valeur est absente

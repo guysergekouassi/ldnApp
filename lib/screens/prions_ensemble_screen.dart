@@ -9,6 +9,8 @@ import 'evangile_du_jour_screen.dart';
 import 'neuvaines_list_screen.dart';
 import 'preparation_confession_screen.dart';
 import 'intentions_semaine_screen.dart';
+import 'divine_misericorde_screen.dart';
+import 'bible_plans_screen.dart';
 
 class PrionsEnsembleScreen extends StatefulWidget {
   const PrionsEnsembleScreen({Key? key}) : super(key: key);
@@ -76,7 +78,9 @@ class _PrionsEnsembleScreenState extends State<PrionsEnsembleScreen> {
           ),
         ),
         Container(
-          height: 250,
+          // Hauteur minimale et non figée : avec un texte agrandi par les
+          // réglages système, le contenu débordait de l'en-tête.
+          constraints: const BoxConstraints(minHeight: 250),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -179,23 +183,43 @@ class _PrionsEnsembleScreenState extends State<PrionsEnsembleScreen> {
             );
           }
 
-          return GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 15,
-            childAspectRatio: 0.55,
-            children: activities
-                .map((activity) => _buildCard(
-                      activity.title,
-                      activity.duration,
-                      activity.imageAsset,
-                      _iconFor(activity.iconName),
-                      _colorFor(activity.colorHex),
-                      onTap: () => _openActivity(activity.action),
-                    ))
-                .toList(),
+          // Un ratio figé donnait une hauteur de cellule proportionnelle à la
+          // largeur de l'écran : sur un petit écran, ou avec un texte agrandi
+          // par les réglages système, le titre et le bouton débordaient.
+          // On calcule la hauteur dont la carte a réellement besoin.
+          return LayoutBuilder(
+            builder: (context, constraints) {
+              const colonnes = 3;
+              const espacement = 10.0;
+              final largeurCarte =
+                  (constraints.maxWidth - espacement * (colonnes - 1)) / colonnes;
+
+              // La vignette occupe 40 % de la carte (flex 40/60 dans _buildCard).
+              // Le reste doit loger le titre (3 lignes), la durée et le bouton,
+              // dont la hauteur suit l'agrandissement de police du système.
+              final echelleTexte = MediaQuery.textScalerOf(context).scale(1.0);
+              final hauteurTexte = 92.0 * echelleTexte;
+              final hauteurCarte = (largeurCarte * 0.62) + hauteurTexte;
+
+              return GridView.count(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisCount: colonnes,
+                crossAxisSpacing: espacement,
+                mainAxisSpacing: 15,
+                childAspectRatio: largeurCarte / hauteurCarte,
+                children: activities
+                    .map((activity) => _buildCard(
+                          activity.title,
+                          activity.duration,
+                          activity.imageAsset,
+                          _iconFor(activity.iconName),
+                          _colorFor(activity.colorHex),
+                          onTap: () => _openActivity(activity.action),
+                        ))
+                    .toList(),
+              );
+            },
           );
         },
       ),
@@ -247,6 +271,12 @@ class _PrionsEnsembleScreenState extends State<PrionsEnsembleScreen> {
         break;
       case 'intentions':
         Navigator.push(context, MaterialPageRoute(builder: (context) => const IntentionsSemaineScreen()));
+        break;
+      case 'misericorde':
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const DivineMisericordeScreen()));
+        break;
+      case 'bible':
+        Navigator.push(context, MaterialPageRoute(builder: (context) => const BiblePlansScreen()));
         break;
       default:
         ScaffoldMessenger.of(context).showSnackBar(

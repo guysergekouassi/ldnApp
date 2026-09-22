@@ -186,8 +186,7 @@ class _MetanoiaLessonScreenState extends State<MetanoiaLessonScreen> {
                                   const SizedBox(width: 10),
                                   Text(
                                     widget.isCompleted ? "Leçon validée" : "Terminer la leçon",
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                  ),
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis),
                                 ],
                               ),
                       ),

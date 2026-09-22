@@ -64,7 +64,9 @@ class _PreparationConfessionScreenState extends State<PreparationConfessionScree
           ),
         ),
         Container(
-          height: 280,
+          // Hauteur minimale et non figée : avec un texte agrandi par les
+          // réglages système, le contenu débordait de l'en-tête.
+          constraints: const BoxConstraints(minHeight: 280),
           width: double.infinity,
           decoration: BoxDecoration(
             gradient: LinearGradient(
