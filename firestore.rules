@@ -42,6 +42,16 @@ service cloud.firestore {
       return request.auth != null && resource.data.authorUid == request.auth.uid;
     }
 
+    // Vrai pour les responsables de la communauté. Être responsable, c'est
+    // avoir un document à son nom dans `admins` : la collection n'est
+    // inscriptible par personne depuis l'application (voir plus bas), elle
+    // se remplit à la main depuis la console Firebase. Un membre ne peut
+    // donc pas se promouvoir lui-même.
+    function estResponsable() {
+      return request.auth != null
+             && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // ---------------------------------------------------------------------
     // 1. Données personnelles
     // ---------------------------------------------------------------------
@@ -172,12 +182,32 @@ service cloud.firestore {
     // fera depuis la console ou un back-office authentifié côté serveur, hors
     // de portée de ces règles.
     match /demandes_ecoute/{demandeId} {
-      allow read: if request.auth != null && resource.data.uid == request.auth.uid;
+      // Une demande se lit par son auteur, et par les responsables qui ont
+      // à la traiter : sans cela elle n'arriverait à personne. Elle reste
+      // fermée au reste de la communauté — ce sont des confidences.
+      allow read: if (request.auth != null && resource.data.uid == request.auth.uid)
+                  || estResponsable();
       allow create: if request.auth != null && request.resource.data.uid == request.auth.uid;
-      allow update: if request.auth != null
-                    && resource.data.uid == request.auth.uid
-                    && request.resource.data.uid == request.auth.uid;
+
+      // L'auteur modifie sa demande ; le responsable n'en change que
+      // l'avancement, et ne peut ni la réécrire ni l'attribuer à un autre.
+      allow update: if (request.auth != null
+                        && resource.data.uid == request.auth.uid
+                        && request.resource.data.uid == request.auth.uid)
+                    || (estResponsable()
+                        && request.resource.data.uid == resource.data.uid
+                        && request.resource.data.message == resource.data.message
+                        && request.resource.data.diff(resource.data).affectedKeys()
+                             .hasOnly(['statut', 'traitePar', 'traiteLe']));
+
       allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // L'annuaire des responsables. Chacun peut vérifier s'il en est un ;
+    // personne ne s'y ajoute depuis l'application, on l'écrit en console.
+    match /admins/{uid} {
+      allow read: if estProprietaire(uid);
+      allow write: if false;
     }
 
     // ---------------------------------------------------------------------

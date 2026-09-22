@@ -32,6 +32,8 @@ const env = await initializeTestEnvironment({
 const alice = env.authenticatedContext('alice').firestore();
 const bob = env.authenticatedContext('bob').firestore();
 const anonyme = env.unauthenticatedContext().firestore();
+// Le responsable de la communauté : il a un document dans `admins`.
+const responsable = env.authenticatedContext('chantal').firestore();
 
 // Contenu de départ, écrit en contournant les règles.
 await env.withSecurityRulesDisabled(async (ctx) => {
@@ -52,6 +54,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, 'parcours_avis/p1__alice'), { parcoursId: 'p1', authorUid: 'alice', note: 5 });
   await setDoc(doc(db, 'demandes_ecoute/d1'), { uid: 'alice', type: 'ecoute', message: 'besoin de parler' });
   await setDoc(doc(db, 'demandes_ecoute/d2'), { uid: 'bob', type: 'ecoute', message: 'prive' });
+  await setDoc(doc(db, 'admins/chantal'), { nom: 'Chantal' });
 });
 
 console.log('\n— Ce que l’application doit pouvoir faire —');
@@ -102,6 +105,18 @@ await verifie('bob ne liste pas toutes les demandes', assertFails(getDocs(collec
 await verifie('bob ne liste pas les demandes d’alice', assertFails(getDocs(query(collection(bob, 'demandes_ecoute'), where('uid', '==', 'alice')))));
 await verifie('bob ne supprime pas la demande d’alice', assertFails(deleteDoc(doc(bob, 'demandes_ecoute/d1'))));
 await verifie('bob ne dépose pas une demande au nom d’alice', assertFails(setDoc(doc(bob, 'demandes_ecoute/d4'), { uid: 'alice', message: 'usurpation' })));
+await verifie('la responsable lit toutes les demandes', assertSucceeds(getDocs(collection(responsable, 'demandes_ecoute'))));
+await verifie('la responsable lit la demande d’alice', assertSucceeds(getDoc(doc(responsable, 'demandes_ecoute/d1'))));
+await verifie('la responsable prend une demande en charge', assertSucceeds(updateDoc(doc(responsable, 'demandes_ecoute/d1'), { statut: 'prise_en_charge', traitePar: 'chantal' })));
+await verifie('la responsable sait qu’elle est responsable', assertSucceeds(getDoc(doc(responsable, 'admins/chantal'))));
+
+console.log('\n— Ce qui doit rester refusé, même à un responsable —');
+await verifie('la responsable ne réécrit pas le message d’alice', assertFails(updateDoc(doc(responsable, 'demandes_ecoute/d1'), { message: 'réécrit' })));
+await verifie('la responsable ne réattribue pas la demande', assertFails(updateDoc(doc(responsable, 'demandes_ecoute/d1'), { uid: 'chantal' })));
+await verifie('la responsable ne supprime pas la demande d’alice', assertFails(deleteDoc(doc(responsable, 'demandes_ecoute/d1'))));
+await verifie('bob ne se déclare pas responsable', assertFails(setDoc(doc(bob, 'admins/bob'), { nom: 'Bob' })));
+await verifie('bob ne lit pas la liste des responsables', assertFails(getDoc(doc(bob, 'admins/chantal'))));
+
 await verifie('bob ne signe pas un avis au nom d’alice', assertFails(setDoc(doc(bob, 'parcours_avis/p3__alice'), { parcoursId: 'p3', authorUid: 'alice', note: 1 })));
 await verifie('bob ne supprime pas l’avis d’alice', assertFails(deleteDoc(doc(bob, 'parcours_avis/p1__alice'))));
 await verifie('une collection non déclarée est fermée', assertFails(getDoc(doc(alice, 'secret_non_declare/x'))));

@@ -3130,4 +3130,67 @@ class FirestoreService {
   Future<void> annulerDemandeEcoute(String demandeId) async {
     await _db.collection('demandes_ecoute').doc(demandeId).delete();
   }
+
+  // -------------------------------------------------------------------------
+  // Responsables
+  // -------------------------------------------------------------------------
+
+  /// Vrai quand ce membre est responsable de la communauté.
+  ///
+  /// Être responsable, c'est avoir un document à son nom dans `admins`. Cette
+  /// collection n'est inscriptible par personne depuis l'application : elle se
+  /// remplit en console. Personne ne peut donc se promouvoir soi-même, et le
+  /// résultat n'est pas une simple préférence d'affichage — les règles
+  /// Firestore s'appuient sur le même document.
+  Stream<bool> estResponsable(String uid) {
+    if (uid.isEmpty) return Stream.value(false);
+    return _db
+        .collection('admins')
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.exists)
+        // Un membre ordinaire se voit refuser la lecture : ce n'est pas une
+        // panne, c'est la réponse « non ».
+        .handleError((_) {})
+        .map((existe) => existe);
+  }
+
+  /// Toutes les demandes d'écoute, pour les responsables.
+  ///
+  /// Le tri se fait en mémoire : la collection compte peu de documents, et un
+  /// `orderBy` imposerait un index composite pour rien.
+  Stream<List<DemandeEcoute>> getToutesLesDemandesEcoute() {
+    return _db.collection('demandes_ecoute').snapshots().map((snapshot) {
+      final demandes = snapshot.docs
+          .map((doc) => DemandeEcoute.fromFirestore(doc.data(), doc.id))
+          .toList();
+
+      // Les plus récentes d'abord, et les demandes ouvertes avant les
+      // clôturées : ce qui attend une réponse se voit en premier.
+      demandes.sort((a, b) {
+        if (a.estOuverte != b.estOuverte) return a.estOuverte ? -1 : 1;
+        final dateA = a.createdAt;
+        final dateB = b.createdAt;
+        if (dateA == null && dateB == null) return 0;
+        if (dateA == null) return 1;
+        if (dateB == null) return -1;
+        return dateB.compareTo(dateA);
+      });
+      return demandes;
+    });
+  }
+
+  /// Fait avancer une demande. Les règles n'autorisent le responsable à
+  /// toucher qu'au statut : ni au message, ni à l'auteur.
+  Future<void> changerStatutDemande({
+    required String demandeId,
+    required String statut,
+    required String parUid,
+  }) async {
+    await _db.collection('demandes_ecoute').doc(demandeId).update({
+      'statut': statut,
+      'traitePar': parUid,
+      'traiteLe': FieldValue.serverTimestamp(),
+    });
+  }
 }

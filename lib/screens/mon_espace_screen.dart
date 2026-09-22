@@ -18,6 +18,7 @@ import '../components/ldn_signature.dart';
 import '../services/auth_service.dart';
 import '../models/discipline_model.dart';
 import 'membre_screen.dart';
+import 'admin_demandes_screen.dart';
 import 'aller_plus_loin_screen.dart';
 
 class MonEspaceScreen extends StatefulWidget {
@@ -88,6 +89,7 @@ class _MonEspaceScreenState extends State<MonEspaceScreen> {
                   _buildIntentions(),
                   const SizedBox(height: 10),
                   _buildAllerPlusLoin(),
+                  _buildEspaceResponsable(),
                   const SizedBox(height: 15),
                   _buildParametres(),
                   const SizedBox(height: 15),
@@ -1199,6 +1201,76 @@ class _MonEspaceScreenState extends State<MonEspaceScreen> {
       default:
         return "Création impossible. Réessaie dans un instant.";
     }
+  }
+
+  /// Entrée vers les demandes d'écoute, pour les responsables.
+  ///
+  /// Rien ne s'affiche pour les autres membres — et ce n'est pas ce widget
+  /// qui protège les demandes : les règles Firestore refusent la lecture à
+  /// quiconque n'est pas dans `admins`. Cacher le bouton évite seulement de
+  /// proposer une porte qui ne s'ouvrirait pas.
+  Widget _buildEspaceResponsable() {
+    if (_uid == null) return const SizedBox.shrink();
+
+    return StreamBuilder<bool>(
+      stream: _firestoreService.estResponsable(_uid!),
+      builder: (context, snapshot) {
+        if (snapshot.data != true) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(15),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AdminDemandesScreen()),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3F0FF),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: const Color(0xFF5B4FC8).withOpacity(0.25)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.volunteer_activism,
+                        color: Color(0xFF5B4FC8), size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Demandes d'écoute",
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Color(0xFF0F172A)),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          "Ce que la communauté confie à l'équipe.",
+                          style: TextStyle(color: Colors.grey, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.chevron_right, color: Colors.grey),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Entrée vers « Aller plus loin ».

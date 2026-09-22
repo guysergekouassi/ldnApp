@@ -80,6 +80,10 @@ class DemandeEcoute {
   final String statut;
   final DateTime? createdAt;
 
+  /// Responsable qui a pris la demande en charge. Vide tant que personne ne
+  /// s'en est saisi.
+  final String traitePar;
+
   DemandeEcoute({
     required this.id,
     required this.uid,
@@ -90,6 +94,7 @@ class DemandeEcoute {
     required this.coordonnee,
     required this.statut,
     this.createdAt,
+    this.traitePar = '',
   });
 
   factory DemandeEcoute.fromFirestore(Map<String, dynamic> data, String id) {
@@ -103,6 +108,7 @@ class DemandeEcoute {
       coordonnee: (data['coordonnee'] ?? '').toString().trim(),
       statut: (data['statut'] ?? StatutDemande.envoyee).toString().trim(),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      traitePar: (data['traitePar'] ?? '').toString().trim(),
     );
   }
 
