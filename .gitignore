@@ -42,7 +42,7 @@ pubspec.lock
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
-firebase.json
+/firebase.json
 
 # Scripts jetables de retouche d'images / remplacement, à chemins absolus.
 crop_image.ps1
